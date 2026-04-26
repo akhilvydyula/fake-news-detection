@@ -1,0 +1,84 @@
+# GitLab CI/CD — mirrors the GitHub Actions workflow (test + pip-audit + Bandit).
+# Pipelines only run on GitLab after this file exists on the branch you push.
+#
+# Debug in UI: GitLab → Build → Pipelines → failed job → job log.
+# Validate YAML: GitLab → Build → Pipeline editor → Validate (or CI Lint).
+
+workflow:
+  rules:
+    # Merge requests + pushes to the default branch (main/master or your GitLab default)
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+stages:
+  - test
+  - security
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  PYTHONUNBUFFERED: "1"
+  # Faster installs when wheels exist
+  PIP_PREFER_BINARY: "1"
+
+default:
+  image: python:3.11-bookworm
+  interruptible: true
+  cache:
+    key: "${CI_COMMIT_REF_SLUG}-pip"
+    paths:
+      - .cache/pip
+
+.test-base:
+  before_script:
+    - python -m pip install --upgrade pip
+
+# --- Test stage -------------------------------------------------------------
+
+test:
+  extends: .test-base
+  stage: test
+  timeout: 35m
+  script:
+    - pip install -e ".[dev]"
+    - python -c "from src.api.main import app; print(app.title)"
+    - pytest -q
+
+# --- Security stage ---------------------------------------------------------
+
+dependency_audit:
+  extends: .test-base
+  stage: security
+  timeout: 40m
+  allow_failure: true
+  script:
+    - pip install pip-audit
+    - pip install -e ".[dev]"
+    - |
+      set +e
+      pip-audit --desc off -f json -o pip-audit-results.json
+      ec=$?
+      pip-audit --desc off || true
+      exit $ec
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - pip-audit-results.json
+
+bandit_sast:
+  extends: .test-base
+  stage: security
+  timeout: 20m
+  script:
+    - pip install "bandit[toml]>=1.7.9"
+    - pip install -e ".[dev]"
+    # Write SARIF for download; second run enforces medium+ findings (same as GitHub CI).
+    - |
+      bandit -r src -c bandit.yaml -f sarif -o bandit-results.sarif \
+        --severity-level medium --confidence-level medium || true
+    - bandit -r src -c bandit.yaml --severity-level medium --confidence-level medium
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - bandit-results.sarif

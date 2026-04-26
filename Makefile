@@ -2,14 +2,19 @@
 # On Windows without `make`, use Invoke instead: `invoke train`, `invoke serve` (see README).
 #
 # Usage:
+#   make venv       # create .venv only (then activate + make install)
 #   make install    # editable install + dev tools (pytest, invoke)
 #   make train
 #   make serve      # then open http://127.0.0.1:8000
 #   make test
 
-.PHONY: install train train-quick serve test mlflow-ui lab
+.PHONY: venv install train train-quick serve test mlflow-ui lab
 
 PYTHON ?= python
+
+venv:
+	$(PYTHON) -m venv .venv
+	@echo "Next: activate .venv, then run: make install"
 
 install:
 	$(PYTHON) -m pip install -U pip

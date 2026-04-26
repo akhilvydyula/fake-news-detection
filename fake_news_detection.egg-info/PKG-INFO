@@ -23,6 +23,8 @@ Requires-Dist: invoke>=2.2.0; extra == "dev"
 
 # Fake news detection prototype
 
+**Step-by-step runbook (setup, train, UI, shortcuts):** [DOCUMENTATION.md](DOCUMENTATION.md)
+
 End-to-end prototype for scoring **draft news text** before you publish it on your site: build a labeled dataset from **permissive public sources**, train **classical (TF–IDF + logistic regression)** and **TensorFlow/Keras** models (BiLSTM and a compact **multi-head attention** encoder), export **interpretable keyword hints**, and run a small CLI scorer.
 
 Reference portal you mentioned for human reading: [BBC Sport](https://www.bbc.com/sport).
@@ -180,12 +182,35 @@ Training writes **`artifacts/metrics.json`**: classical **train / val / test** p
 - **Underfitting:** both train and validation metrics are low → richer features, more data, or a stronger model may help.
 - **ROC-AUC** is on a **0–1** scale (e.g. **0.99** means 99% AUC, not “19%”). Compare **validation vs test** AUC to see if the hold-out is stable.
 
-## CI (GitHub Actions)
+## CI / CD and security scanning (GitHub)
 
-On push/PR to `main` or `master`, [`.github/workflows/ci.yml`](.github/workflows/ci.yml) installs dependencies, imports the FastAPI app, and runs `pytest`. Use the same checks locally:
+Workflows under [`.github/workflows/`](.github/workflows/) run on push and pull requests to `main` or `master`.
+
+| Workflow | Purpose | GitLab analogy (conceptual) |
+|----------|---------|-----------------------------|
+| [`ci.yml`](.github/workflows/ci.yml) | **Test** (pytest + import smoke), **Bandit** SAST with SARIF upload, **pip-audit** dependency report + artifact | `test` job + `SAST` / `dependency_scanning` |
+| [`codeql.yml`](.github/workflows/codeql.yml) | **CodeQL** semantic analysis (Python) | Advanced SAST / security scanning |
+| [`dependabot.yml`](.github/dependabot.yml) | Weekly PRs to bump **pip** + **GitHub Actions** deps | Dependency bot / Renovate |
+
+**Where to look when debugging**
+
+- **Actions** tab → failed job → expand steps; Bandit prints file/line; pip-audit prints vulnerable packages.
+- **Security** tab → **Code scanning** (CodeQL + Bandit SARIF once enabled for the repo).
+- **pip-audit** uploads a **`pip-audit-results`** artifact (JSON) even when the job is non-blocking.
+
+**Policy knobs**
+
+- **Bandit:** configured in [`bandit.yaml`](bandit.yaml). Medium+ severity fails the `sast-bandit` job; tune skips there with care.
+- **pip-audit:** the audit step uses `continue-on-error: true` by default so TensorFlow-heavy stacks do not block every class PR. To **block merges** on known CVEs, edit `ci.yml` and remove `continue-on-error: true` from the pip-audit step (and triage with `pip-audit --ignore-vuln …` only when justified).
+- **Fork PRs:** SARIF upload to the base repo may be restricted by GitHub for untrusted forks; see [GitHub docs on code scanning and pull requests](https://docs.github.com/en/code-security/code-scanning/creating-an-advanced-setup-for-code-scanning/configuring-advanced-setup-for-code-scanning#considerations-for-private-repositories-and-forks).
+
+Local parity:
 
 ```powershell
 pytest -q
+pip install "bandit[toml]" pip-audit
+bandit -r src -c bandit.yaml
+pip install -e ".[dev]"; pip-audit --desc off
 ```
 
 ## Notebooks (for class and debugging)

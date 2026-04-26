@@ -1,5 +1,7 @@
 # Fake news detection prototype
 
+**Step-by-step runbook (setup, train, UI, shortcuts):** [DOCUMENTATION.md](DOCUMENTATION.md)
+
 End-to-end prototype for scoring **draft news text** before you publish it on your site: build a labeled dataset from **permissive public sources**, train **classical (TF–IDF + logistic regression)** and **TensorFlow/Keras** models (BiLSTM and a compact **multi-head attention** encoder), export **interpretable keyword hints**, and run a small CLI scorer.
 
 Reference portal you mentioned for human reading: [BBC Sport](https://www.bbc.com/sport).
@@ -157,7 +159,11 @@ Training writes **`artifacts/metrics.json`**: classical **train / val / test** p
 - **Underfitting:** both train and validation metrics are low → richer features, more data, or a stronger model may help.
 - **ROC-AUC** is on a **0–1** scale (e.g. **0.99** means 99% AUC, not “19%”). Compare **validation vs test** AUC to see if the hold-out is stable.
 
-## CI / CD and security scanning (GitHub)
+## CI / CD and security scanning
+
+**GitLab:** GitLab **ignores** `.github/workflows/`. Use [`.gitlab-ci.yml`](.gitlab-ci.yml) at the repo root. If no pipeline appears, see **[GITLAB.md](GITLAB.md)** (default branch, shared runners, `glab` vs `gitlab-runner`, local commands).
+
+### GitHub
 
 Workflows under [`.github/workflows/`](.github/workflows/) run on push and pull requests to `main` or `master`.
 
