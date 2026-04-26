@@ -169,21 +169,21 @@ Workflows under [`.github/workflows/`](.github/workflows/) run on push and pull 
 
 | Workflow | Purpose | GitLab analogy (conceptual) |
 |----------|---------|-----------------------------|
-| [`ci.yml`](.github/workflows/ci.yml) | **Test** (pytest + import smoke), **Bandit** SAST with SARIF upload, **pip-audit** dependency report + artifact | `test` job + `SAST` / `dependency_scanning` |
+| [`ci.yml`](.github/workflows/ci.yml) | **Test** (pytest + import smoke), **Bandit** SAST + JSON artifact, **pip-audit** dependency report + artifact | `test` job + `SAST` / `dependency_scanning` |
 | [`codeql.yml`](.github/workflows/codeql.yml) | **CodeQL** semantic analysis (Python) | Advanced SAST / security scanning |
 | [`dependabot.yml`](.github/dependabot.yml) | Weekly PRs to bump **pip** + **GitHub Actions** deps | Dependency bot / Renovate |
 
 **Where to look when debugging**
 
 - **Actions** tab → failed job → expand steps; Bandit prints file/line; pip-audit prints vulnerable packages.
-- **Security** tab → **Code scanning** (CodeQL + Bandit SARIF once enabled for the repo).
+- **Security** tab → **Code scanning** for **CodeQL** (enable for the repo). Bandit results: **`bandit-results`** workflow artifact (JSON).
 - **pip-audit** uploads a **`pip-audit-results`** artifact (JSON) even when the job is non-blocking.
 
 **Policy knobs**
 
 - **Bandit:** configured in [`bandit.yaml`](bandit.yaml). Medium+ severity fails the `sast-bandit` job; tune skips there with care.
 - **pip-audit:** the audit step uses `continue-on-error: true` by default so TensorFlow-heavy stacks do not block every class PR. To **block merges** on known CVEs, edit `ci.yml` and remove `continue-on-error: true` from the pip-audit step (and triage with `pip-audit --ignore-vuln …` only when justified).
-- **Fork PRs:** SARIF upload to the base repo may be restricted by GitHub for untrusted forks; see [GitHub docs on code scanning and pull requests](https://docs.github.com/en/code-security/code-scanning/creating-an-advanced-setup-for-code-scanning/configuring-advanced-setup-for-code-scanning#considerations-for-private-repositories-and-forks).
+- **Fork PRs:** Code scanning uploads may be restricted for untrusted forks; see [GitHub docs on code scanning and pull requests](https://docs.github.com/en/code-security/code-scanning/creating-an-advanced-setup-for-code-scanning/configuring-advanced-setup-for-code-scanning#considerations-for-private-repositories-and-forks).
 
 Local parity:
 

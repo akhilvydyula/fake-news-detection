@@ -72,13 +72,13 @@ bandit_sast:
   script:
     - pip install "bandit[toml]>=1.7.9"
     - pip install -e ".[dev]"
-    # Write SARIF for download; second run enforces medium+ findings (same as GitHub CI).
+    # JSON report for artifacts (Bandit 1.9.x has no -f sarif); enforce medium+ on screen run.
     - |
-      bandit -r src -c bandit.yaml -f sarif -o bandit-results.sarif \
+      bandit -r src -c bandit.yaml -f json -o bandit-results.json \
         --severity-level medium --confidence-level medium || true
     - bandit -r src -c bandit.yaml --severity-level medium --confidence-level medium
   artifacts:
     when: always
     expire_in: 1 week
     paths:
-      - bandit-results.sarif
+      - bandit-results.json

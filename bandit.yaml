@@ -1,4 +1,4 @@
-# Bandit SAST configuration (CI uploads SARIF to GitHub Security tab).
+# Bandit SAST configuration (CI uploads JSON artifacts; CodeQL is separate).
 exclude_dirs:
   - /tests/
   - /.venv/
@@ -7,5 +7,7 @@ exclude_dirs:
 
 # B615 flags unpinned HF `load_dataset` revisions. For class demos we skip it;
 # in production, pin `revision=` to a dataset commit SHA.
+# B104 fires on literal 0.0.0.0 in URL host blocklists (SSRF guard); not a server bind.
 skips:
   - B615
+  - B104

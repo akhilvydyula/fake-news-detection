@@ -11,6 +11,7 @@ Usage (from project root, after `pip install invoke` or `pip install -e ".[dev]"
   invoke train-quick
   invoke serve
   invoke test
+  invoke doctor     # artifact + UI paths (no TF)
   invoke lab        # quick train + serve (smoke)
 """
 
@@ -101,6 +102,12 @@ def serve(c, host="127.0.0.1", port=8000):
 def test(c):
     """Run pytest."""
     c.run(f"{_py()} -m pytest -q", cwd=str(ROOT))
+
+
+@task
+def doctor(c):
+    """Check artifact files and UI paths (no TensorFlow import). Exit 1 if classical model missing."""
+    c.run(f'{_py()} -m src.pipeline.doctor', cwd=str(ROOT))
 
 
 @task

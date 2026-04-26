@@ -92,7 +92,6 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
-      security-events: write
     steps:
       - uses: actions/checkout@v4
 
@@ -107,22 +106,16 @@ jobs:
           pip install "bandit[toml]>=1.7.9"
           pip install -e ".[dev]"
 
-      - name: Bandit (SARIF + console)
-        id: bandit
+      - name: Bandit (JSON artifact + enforcing run)
         run: |
-          bandit -r src -c bandit.yaml -f sarif -o bandit-results.sarif \
-            --severity-level medium --confidence-level medium
-        continue-on-error: true
+          bandit -r src -c bandit.yaml -f json -o bandit-results.json \
+            --severity-level medium --confidence-level medium || true
+          bandit -r src -c bandit.yaml --severity-level medium --confidence-level medium
 
-      - name: Upload Bandit SARIF
-        if: always() && hashFiles('bandit-results.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v3
+      - name: Upload Bandit JSON
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          sarif_file: bandit-results.sarif
-          category: bandit
-
-      - name: Fail if Bandit found issues
-        if: steps.bandit.outcome == 'failure'
-        run: |
-          echo "::error::Bandit reported medium+ issues. See job log; SARIF may appear under Security -> Code scanning."
-          exit 1
+          name: bandit-results
+          path: bandit-results.json
+          if-no-files-found: ignore

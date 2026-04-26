@@ -7,8 +7,9 @@
 #   make train
 #   make serve      # then open http://127.0.0.1:8000
 #   make test
+#   make doctor   # artifact + UI paths (no TensorFlow)
 
-.PHONY: venv install train train-quick serve test mlflow-ui lab
+.PHONY: venv install train train-quick serve test doctor mlflow-ui lab
 
 PYTHON ?= python
 
@@ -31,6 +32,9 @@ serve:
 
 test:
 	$(PYTHON) -m pytest -q
+
+doctor:
+	$(PYTHON) -m src.pipeline.doctor
 
 mlflow-ui:
 	$(PYTHON) -m mlflow ui --backend-store-uri ./mlruns

@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>News Trust Platform</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/assets/platform.css" />
+</head>
+<body>
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href="#home" class="logo" id="brand-logo">News<span>Trust</span></a>
+      <div class="nav-links">
+        <a href="#home" data-page="home">Home</a>
+        <a href="#dashboard" data-page="dashboard">Dashboard</a>
+        <a href="#pricing" data-page="pricing">Pricing</a>
+        <a href="#docs" data-page="docs">Docs &amp; API</a>
+        <a href="#security" data-page="security">Security</a>
+        <a href="#dashboard" class="nav-cta">Analyze</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="shell">
+    <section id="page-home" class="page active" data-page="home">
+      <div class="hero">
+        <h1 id="hero-title">Triage news before you trust it</h1>
+        <p class="sub" id="hero-sub">
+          Paste text or a URL. Get plain-language scores for misinformation risk, AI-style patterns, and how hard an item should be queued for review — plus short signal cards and an extractive summary. ML assists humans; it does not replace editorial judgment.
+        </p>
+        <div class="pill-row">
+          <span class="pill">Misinformation triage</span>
+          <span class="pill">AI-generated patterns (heuristic)</span>
+          <span class="pill">API-ready</span>
+          <span class="pill">Optional API key</span>
+        </div>
+      </div>
+      <div class="grid-3">
+        <div class="card">
+          <h3>Multi-signal dashboard</h3>
+          <p>See misinformation-style score, experimental AI-pattern cues, and a combined triage score in one view — with progress rings and explainable signal cards.</p>
+        </div>
+        <div class="card">
+          <h3>URL or paste</h3>
+          <p>Fetch article text from allowed URLs (with safety limits) or analyze pasted headlines and bodies directly.</p>
+        </div>
+        <div class="card">
+          <h3>Platform path</h3>
+          <p>Pricing tiers, documentation, and <code>POST /api/v1/analyze</code> for your CMS, newsroom tools, or custom workflows.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="page-dashboard" class="page" data-page="dashboard">
+      <div class="hero" style="padding-top: 1rem;">
+        <h1>Analysis dashboard</h1>
+        <p class="sub">Run an analysis. Results combine your ML backend with enrichment (summary + signal cards you own and tune in code).</p>
+      </div>
+      <div class="dash-grid">
+        <div class="panel">
+          <h2>Input</h2>
+          <div class="tabs-inline">
+            <label><input type="radio" name="mode" value="paste" checked /> Paste</label>
+            <label><input type="radio" name="mode" value="url" /> From URL</label>
+          </div>
+          <div id="paste-fields">
+            <div class="field">
+              <label for="title">Title (optional)</label>
+              <input id="title" type="text" placeholder="Headline" />
+            </div>
+            <div class="field">
+              <label for="body">Body</label>
+              <textarea id="body" placeholder="Article text (longer is better)"></textarea>
+            </div>
+          </div>
+          <div id="url-fields" style="display:none;">
+            <div class="field">
+              <label for="url">Article URL</label>
+              <input id="url" type="url" placeholder="https://example.com/article" />
+            </div>
+          </div>
+          <div class="field">
+            <label for="backend">ML backend</label>
+            <select id="backend">
+              <option value="classical">Classical (TF–IDF + LR)</option>
+              <option value="bilstm">Keras BiLSTM (if trained)</option>
+              <option value="mini_transformer">Keras mini transformer (if trained)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="apiKey">API key (optional)</label>
+            <input id="apiKey" type="password" autocomplete="off" placeholder="If server requires X-API-Key" />
+          </div>
+          <button type="button" class="btn-primary" id="btn-analyze">Run analysis</button>
+          <div class="err" id="analyze-err" hidden></div>
+        </div>
+        <div class="panel" id="results-panel">
+          <h2>Results</h2>
+          <p id="results-placeholder" style="color:var(--muted);margin:0;">Submit an analysis to see scores and signal breakdown.</p>
+          <div id="results-content" hidden>
+            <div class="summary-box" id="summary-box" hidden>
+              <h3>Summary</h3>
+              <p id="summary-text"></p>
+            </div>
+            <div class="rings" id="rings"></div>
+            <h3 style="font-family:var(--display);font-size:1rem;margin:0 0 0.75rem;">Signals (your deployment, your thresholds)</h3>
+            <div class="signal-cards" id="signal-cards"></div>
+            <div class="disclaimer" id="product-framing"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="page-pricing" class="page" data-page="pricing">
+      <div class="hero" style="padding-top: 1rem;">
+        <h1>Pricing</h1>
+        <p class="sub">MVP tiers for teams that need triage, API access, and optional dedicated support. Contact us for enterprise SLAs.</p>
+      </div>
+      <div class="price-grid">
+        <div class="price-card">
+          <h3>Starter</h3>
+          <div class="amt">Free</div>
+          <p style="color:var(--muted);margin:0;font-size:0.9rem;">Self-hosted or shared demo limits.</p>
+          <ul>
+            <li>Dashboard + paste/URL analyze</li>
+            <li>OpenAPI at <code>/openapi.json</code></li>
+            <li>Community support</li>
+          </ul>
+        </div>
+        <div class="price-card featured">
+          <h3>Team</h3>
+          <div class="amt">Custom</div>
+          <p style="color:var(--muted);margin:0;font-size:0.9rem;">API key auth, rate limits, usage reporting.</p>
+          <ul>
+            <li><code>X-API-Key</code> + audit logs</li>
+            <li>Higher throughput</li>
+            <li>Newsroom onboarding</li>
+          </ul>
+        </div>
+        <div class="price-card">
+          <h3>Enterprise</h3>
+          <div class="amt">Custom</div>
+          <p style="color:var(--muted);margin:0;font-size:0.9rem;">VPC, SSO, custom models, SLA.</p>
+          <ul>
+            <li>Private deployment</li>
+            <li>Custom fine-tuning pipeline</li>
+            <li>Dedicated success engineer</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="page-docs" class="page" data-page="docs">
+      <div class="hero" style="padding-top: 1rem;">
+        <h1>Documentation &amp; API</h1>
+        <p class="sub">Integrate <code>POST /api/v1/analyze</code> into your CMS, alerts, or internal tools. Responses include ML scores and a <code>platform</code> block for UI.</p>
+      </div>
+      <div class="card" style="margin-bottom:1.25rem;">
+        <h3>OpenAPI</h3>
+        <p>Interactive schema: <a href="/openapi.json" target="_blank" rel="noopener">/openapi.json</a> — import into Postman or generate a client.</p>
+      </div>
+      <div class="card">
+        <h3>Example: analyze paste</h3>
+        <pre class="code" id="curl-paste"></pre>
+      </div>
+      <div class="card" style="margin-top:1.25rem;">
+        <h3>Example: analyze URL</h3>
+        <pre class="code" id="curl-url"></pre>
+      </div>
+      <div class="card" style="margin-top:1.25rem;">
+        <h3>Usage metering (per org)</h3>
+        <p style="color:var(--muted);margin:0 0 0.75rem;font-size:0.95rem;">After you configure API keys on the server, each org can query how many <code>POST /api/v1/analyze</code> calls were counted for their key (SQLite on the server; not shown in anonymous demo mode).</p>
+        <pre class="code" id="curl-usage"></pre>
+      </div>
+    </section>
+
+    <section id="page-security" class="page" data-page="security">
+      <div class="hero" style="padding-top: 1rem;">
+        <h1>Security &amp; data</h1>
+        <p class="sub">Design for newsrooms and compliance-minded teams: optional API keys, no training on your payloads by default, and clear separation of triage vs. ground truth.</p>
+      </div>
+      <div class="grid-3">
+        <div class="card">
+          <h3>Authentication</h3>
+          <p>Use <code>PLATFORM_API_KEY</code> for a single tenant, or <code>PLATFORM_API_KEYS</code> (JSON map of key → org id) for multiple customers. Clients send <code>X-API-Key</code>; secrets never appear in JSON responses. Successful analyzes may include <code>tenant.org_id</code>.</p>
+        </div>
+        <div class="card">
+          <h3>URL fetch safety</h3>
+          <p>URL ingestion uses size limits and blocks private/reserved hosts to reduce SSRF risk. Allowlists can be tightened per deployment.</p>
+        </div>
+        <div class="card">
+          <h3>Your data</h3>
+          <p>Analysis is for real-time triage. Fine-tuning on customer data is a separate, explicit agreement — not the default path.</p>
+        </div>
+      </div>
+      <p class="disclaimer" style="border:none;margin-top:2rem;">
+        Legacy teacher UI remains at <a href="/classic">/classic</a>. This product shell is served at <code>/</code>.
+      </p>
+    </section>
+  </div>
+
+  <footer class="footer-site">
+    <span id="footer-brand">News Trust Platform</span> — MVP. Scores are assistive, not legal or journalistic verdicts.
+  </footer>
+
+  <script src="/assets/platform.js" defer></script>
+</body>
+</html>

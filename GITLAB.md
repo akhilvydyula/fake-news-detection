@@ -24,7 +24,7 @@ On GitLab, only **`.gitlab-ci.yml`** (in the repo root) defines pipelines.
 |--------|-----|---------|
 | `test` | `test` | `pip install -e ".[dev]"`, import FastAPI app, `pytest` |
 | `security` | `dependency_audit` | `pip-audit` (+ JSON artifact). **`allow_failure: true`** so known ML transitive CVEs do not block teaching. |
-| `security` | `bandit_sast` | **Bandit** on `src/`; fails on medium+ issues (like GitHub). SARIF in job artifacts. |
+| `security` | `bandit_sast` | **Bandit** on `src/`; fails on medium+ issues (like GitHub). **`bandit-results.json`** in job artifacts. |
 
 ---
 

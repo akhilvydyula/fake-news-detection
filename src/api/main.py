@@ -1,4 +1,4 @@
-"""FastAPI app: beginner-friendly JSON + static UI for news draft review."""
+"""FastAPI app: platform UI + legacy UI + REST APIs (v1 for integrations)."""
 
 from __future__ import annotations
 
@@ -7,14 +7,22 @@ from pathlib import Path
 from typing import Any, Literal
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, HttpUrl
 
+from src.api.deps import (
+    PlatformAuth,
+    auth_configured,
+    auth_mode,
+    require_platform_api_key,
+)
+from src.api.usage_store import log_usage, usage_summary
 from src.config import PROJECT_ROOT
 from src.ingest.fetch_url import fetch_url_text
+from src.service.enrichment import enrich_platform_payload
 from src.service.predictor import (
     artifacts_ready,
     build_api_response,
@@ -25,11 +33,15 @@ from src.service.predictor import (
 )
 
 STATIC_DIR = PROJECT_ROOT / "static"
+WEB_DIR = PROJECT_ROOT / "web"
 
 app = FastAPI(
-    title="News draft helper",
-    description="Decision support for editors—not a fact checker. Plain language for readers; optional teacher metrics.",
-    version="0.3.0",
+    title="News Trust Platform API",
+    description="Detector management & triage API for newsrooms. v1 for secure integrations.",
+    version="0.5.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json",
 )
 
 app.add_middleware(
@@ -57,10 +69,27 @@ class AnalyzeUrlRequest(BaseModel):
     teacher_mode: bool = False
 
 
+class V1AnalyzeRequest(BaseModel):
+    """Unified payload for dashboard and partner integrations."""
+
+    title: str = Field(default="", max_length=500)
+    body: str = Field(default="", max_length=55_000)
+    url: HttpUrl | None = None
+    backend: Literal["classical", "bilstm", "mini_transformer"] = "classical"
+    teacher_mode: bool = False
+
+
 @app.get("/api/health")
 def health() -> dict[str, Any]:
     ready = artifacts_ready()
-    return {"status": "ok" if any(ready.values()) else "no_models", "artifacts": ready}
+    return {
+        "status": "ok" if any(ready.values()) else "no_models",
+        "artifacts": ready,
+        "api_key_required": auth_configured(),
+        "auth_mode": auth_mode(),
+        "brand": os.environ.get("PLATFORM_BRAND_NAME", "News Trust Platform"),
+        "usage_endpoint": "/api/v1/usage",
+    }
 
 
 @app.get("/api/model-info")
@@ -74,6 +103,7 @@ def model_info(teacher_mode: bool = False) -> dict[str, Any]:
         ),
         "product_framing": product_framing(),
         "artifacts": artifacts_ready(),
+        "v1_endpoint": "/api/v1/analyze",
     }
     if teacher_mode and metrics:
         base["training_metrics"] = metrics
@@ -84,6 +114,75 @@ def model_info(teacher_mode: bool = False) -> dict[str, Any]:
             "examples_pushed_toward_review_in_training": hints.get("ngrams_associated_with_predicted_fake", [])[:15],
         }
     return base
+
+
+def _resolve_text_and_source(req: V1AnalyzeRequest) -> tuple[str, dict[str, Any]]:
+    if req.url is not None:
+        try:
+            body_text, meta = fetch_url_text(str(req.url))
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
+        except httpx.HTTPError as e:
+            raise HTTPException(status_code=502, detail=f"Could not fetch URL: {e}") from e
+        text = build_full_text(req.title, body_text)
+        src = {"type": "url", **meta, "compliance_note": "Process only content you have rights to use."}
+    else:
+        text = build_full_text(req.title, req.body)
+        src = {"type": "paste"}
+    return text, src
+
+
+@app.post("/api/v1/analyze")
+def analyze_v1(
+    req: V1AnalyzeRequest,
+    auth: PlatformAuth = Depends(require_platform_api_key),
+) -> dict[str, Any]:
+    """
+    Platform analyze: same scoring as legacy endpoints plus `platform` block
+    (summary, dimensions, `signal_cards`). Optional `X-API-Key` when keys are configured.
+    When authenticated, response may include `tenant.org_id` and the call is metered (see GET /api/v1/usage).
+    """
+    status = 200
+    try:
+        text, src = _resolve_text_and_source(req)
+        if len(text.strip()) < 20:
+            raise HTTPException(status_code=400, detail="Text too short after resolving URL or paste.")
+
+        base = build_api_response(text, req.backend, req.teacher_mode)
+        if base is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Model files are missing. Run: python -m src.pipeline.run_train",
+            )
+        out = enrich_platform_payload(base, text, req.backend)
+        out["source"] = src
+        out["platform"]["brand_hint"] = os.environ.get("PLATFORM_BRAND_NAME", "News Trust Platform")
+        if auth.org_id is not None:
+            out["tenant"] = {"org_id": auth.org_id}
+        return out
+    except HTTPException as e:
+        status = e.status_code
+        raise
+    finally:
+        if auth.org_id is not None:
+            log_usage(auth.org_id, "/api/v1/analyze", status)
+
+
+@app.get("/api/v1/usage")
+def usage_v1(
+    days: int = 30,
+    auth: PlatformAuth = Depends(require_platform_api_key),
+) -> dict[str, Any]:
+    """
+    Per-organization analyze call counts (POST /api/v1/analyze only). Requires the same auth as analyze.
+    In anonymous demo mode (no keys configured), returns 401.
+    """
+    if auth.org_id is None:
+        raise HTTPException(
+            status_code=401,
+            detail="Usage reporting requires API keys. Set PLATFORM_API_KEY or PLATFORM_API_KEYS on the server.",
+        )
+    return usage_summary(auth.org_id, days=min(max(days, 1), 366))
 
 
 @app.post("/api/analyze")
@@ -107,10 +206,6 @@ def analyze(req: AnalyzeRequest) -> dict[str, Any]:
 
 @app.post("/api/analyze-url")
 def analyze_url(req: AnalyzeUrlRequest) -> dict[str, Any]:
-    """
-    Fetch a public HTML page and score extracted text. Respect site ToS and robots rules;
-    for production, prefer your CMS webhook or licensed feeds instead of hotlinking third parties.
-    """
     try:
         text, meta = fetch_url_text(str(req.url))
     except ValueError as e:
@@ -136,12 +231,25 @@ def analyze_url(req: AnalyzeUrlRequest) -> dict[str, Any]:
 
 
 @app.get("/")
-def index() -> FileResponse:
-    index_path = STATIC_DIR / "index.html"
+def platform_index() -> FileResponse:
+    index_path = WEB_DIR / "index.html"
     if not index_path.is_file():
-        raise HTTPException(status_code=404, detail="static/index.html missing")
+        index_path = STATIC_DIR / "index.html"
+    if not index_path.is_file():
+        raise HTTPException(status_code=404, detail="web/index.html missing")
     return FileResponse(index_path)
 
+
+@app.get("/classic")
+def classic_index() -> FileResponse:
+    p = STATIC_DIR / "index.html"
+    if not p.is_file():
+        raise HTTPException(status_code=404, detail="legacy UI missing")
+    return FileResponse(p)
+
+
+if (WEB_DIR / "assets").is_dir():
+    app.mount("/assets", StaticFiles(directory=str(WEB_DIR / "assets")), name="platform-assets")
 
 if STATIC_DIR.is_dir():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")

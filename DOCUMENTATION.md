@@ -101,13 +101,25 @@ python -m uvicorn src.api.main:app --reload --host 127.0.0.1 --port 8000
 
 Then open:
 
-- **UI:** http://127.0.0.1:8000/ — choose **Paste text** or **Article URL** (URL mode calls `POST /api/analyze-url`; only use sites you may access).
+- **Product UI (dashboard, pricing, docs):** http://127.0.0.1:8000/ — analyzes via `POST /api/v1/analyze` (paste or `url` in JSON). Static assets live under `web/`.
+- **Legacy teacher UI:** http://127.0.0.1:8000/classic — original paste/URL flow (`/api/analyze`, `/api/analyze-url`).
 - **Interactive API docs:** http://127.0.0.1:8000/docs
-- **Health:** http://127.0.0.1:8000/api/health
+- **Health:** http://127.0.0.1:8000/api/health — includes `api_key_required`, `auth_mode` (`anonymous` \| `single` \| `multi`), `brand`, artifact flags, and `usage_endpoint`.
+
+**Optional environment variables (platform):**
+
+- `PLATFORM_API_KEY` — single shared secret; clients send `X-API-Key`. Org id for metering defaults to `default`, or set `PLATFORM_DEFAULT_ORG_ID`.
+- `PLATFORM_API_KEYS` — JSON object mapping each API key string to an org id, e.g. `{"sk_live_acme_xxx":"org_acme","sk_live_beta_yyy":"org_beta"}`. When this is set (non-empty after parse), it takes precedence over `PLATFORM_API_KEY` for v1 routes.
+- `PLATFORM_USAGE_DB` — optional path to the SQLite file for request metering (default: `data/interim/platform_usage.sqlite`).
+- `PLATFORM_BRAND_NAME` — shown in the health payload and product nav (e.g. your company name).
 
 If `503` on analyze, train first (step 2) so `artifacts/` exists.
 
-**JSON API for unseen URL workflow:** `POST /api/analyze-url` with body `{"url":"https://...","backend":"classical","teacher_mode":false}`.
+**Unified integration endpoint:** `POST /api/v1/analyze` with body `{"title":"...","body":"...","backend":"classical"}` or `{"url":"https://...","backend":"classical"}`. Response includes a `platform` block (summary, dimensions, `signal_cards`) for dashboards — deterministic scoring helpers you operate and tune, not third-party “agencies.” When authenticated, responses may include `tenant.org_id`.
+
+**Usage metering:** `GET /api/v1/usage?days=30` with the same `X-API-Key` returns per-org counts of `POST /api/v1/analyze` calls (not available in anonymous demo mode).
+
+**Legacy JSON:** `POST /api/analyze-url` with body `{"url":"https://...","backend":"classical","teacher_mode":false}` (use only where you may access the URL).
 
 ---
 
@@ -131,9 +143,12 @@ invoke train
 invoke train-quick
 invoke serve
 invoke test
+invoke doctor       # artifact + UI paths (no TensorFlow import)
 invoke lab          # train-quick then serve (blocks)
 invoke mlflow-ui    # optional; separate terminal
 ```
+
+**Operator runbook:** see `MAINTENANCE.md` (deploy checks, retrain, env vars).
 
 **No `make` on Windows?** Use the table below: the **Invoke** column is the same job as **Make**.
 
@@ -151,6 +166,7 @@ invoke mlflow-ui    # optional; separate terminal
 | **`make train-quick`** | `python -m src.pipeline.run_train --quick --skip-build` | Fast check: small run, **reuses** existing CSVs in `data/processed/`. |
 | **`make serve`** | Starts **FastAPI** + UI with reload on port **8000** | You want the browser UI at http://127.0.0.1:8000/ (train at least once first). |
 | **`make test`** | `pytest -q` | You changed code and want the same checks as CI. |
+| **`make doctor`** | `python -m src.pipeline.doctor` | Quick JSON report: model files + `web/` / `static/` index (no TF import). |
 | **`make mlflow-ui`** | `mlflow ui --backend-store-uri ./mlruns` | You ran training with `--mlflow` and want the experiment browser. |
 | **`make lab`** | Runs **`train-quick`** then **`serve`** (server runs until Ctrl+C) | Quick demo: refresh models on saved data, then open the app. |
 
