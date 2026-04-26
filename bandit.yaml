@@ -1,0 +1,11 @@
+# Bandit SAST configuration (CI uploads SARIF to GitHub Security tab).
+exclude_dirs:
+  - /tests/
+  - /.venv/
+  - /venv/
+  - /notebooks/
+
+# B615 flags unpinned HF `load_dataset` revisions. For class demos we skip it;
+# in production, pin `revision=` to a dataset commit SHA.
+skips:
+  - B615

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>News draft helper</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:opsz,wght@9..144,600&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div class="page">
+    <header class="hero">
+      <p class="eyebrow">Editorial decision support</p>
+      <h1>Is this draft worth a <span class="accent">second look</span>?</h1>
+      <p class="lede">
+        Paste a headline and a short excerpt. We compare your text to patterns from a research dataset—
+        <strong>not</strong> to the real world. We never replace fact-checking or your judgment.
+      </p>
+    </header>
+
+    <main class="grid">
+      <section class="card form-card">
+        <h2>Your draft</h2>
+        <label class="field">
+          <span>Headline</span>
+          <input id="title" type="text" maxlength="500" placeholder="e.g. City council approves new stadium funding" />
+        </label>
+        <label class="field">
+          <span>Article text (first few paragraphs are enough)</span>
+          <textarea id="body" rows="10" maxlength="50000" placeholder="Paste the opening paragraphs here…"></textarea>
+        </label>
+        <div class="row">
+          <label class="field inline">
+            <span>Checker</span>
+            <select id="backend">
+              <option value="classical" selected>Fast explanation (recommended)</option>
+              <option value="bilstm">Neural — BiLSTM</option>
+              <option value="mini_transformer">Neural — small Transformer</option>
+            </select>
+          </label>
+          <label class="toggle">
+            <input type="checkbox" id="teacher" />
+            <span>Teacher / advanced metrics</span>
+          </label>
+        </div>
+        <button type="button" id="analyze" class="primary">Analyze draft</button>
+        <p id="error" class="error" hidden></p>
+      </section>
+
+      <section class="card result-card" id="result" hidden>
+        <div id="verdict-badge" class="badge">—</div>
+        <h2 id="headline">—</h2>
+        <p id="detail" class="detail">—</p>
+        <div class="meter-wrap">
+          <div class="meter-label"><span>Toward “needs review”</span><span id="meter-pct">0%</span></div>
+          <div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="meter-bar"></div>
+        </div>
+        <p id="scale-note" class="muted small">—</p>
+
+        <div class="explain">
+          <h3>What influenced this score?</h3>
+          <p class="muted small">
+            These are phrases <em>in your text</em> that pushed the fast model toward “review” or “reliable.”
+            They are statistical—not proof something is false or true.
+          </p>
+          <ul id="phrases" class="phrase-list"></ul>
+        </div>
+
+        <div id="teacher-panel" class="teacher" hidden>
+          <h3>For instructors (precision / recall)</h3>
+          <p class="muted small" id="teacher-note"></p>
+          <pre id="teacher-json" class="code"></pre>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>
+        Built for teaching and editorial workflows. Train models locally with
+        <code>python -m src.pipeline.run_train</code> and track runs with MLflow (see README).
+      </p>
+    </footer>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

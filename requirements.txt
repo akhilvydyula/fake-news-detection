@@ -1,0 +1,27 @@
+# Prefer a single install line (editable app + dev tools):
+#   pip install -e ".[dev]"
+# See also: pyproject.toml, Makefile, tasks.py (Invoke).
+#
+# Core ML / data
+numpy>=1.26.0
+pandas>=2.2.0
+scikit-learn>=1.5.0
+datasets>=3.0.0
+huggingface_hub>=0.24.0
+
+# Deep learning (TensorFlow / Keras)
+tensorflow>=2.16.0
+
+# NLP utilities
+regex>=2024.0.0
+
+# API + UI backend
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+pydantic>=2.0.0
+
+# Experiment tracking (optional at runtime; used when --mlflow is passed)
+mlflow>=2.16.0
+
+# Dev / CI
+pytest>=8.0.0
