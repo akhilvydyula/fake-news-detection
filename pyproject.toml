@@ -32,6 +32,9 @@ dev = [
     "invoke>=2.2.0",
 ]
 
+[project.scripts]
+news-trust-platform = "src.api.__main__:main"
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["src", "src.*"]

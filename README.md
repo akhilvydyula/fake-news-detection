@@ -2,6 +2,8 @@
 
 **Step-by-step runbook (setup, train, UI, shortcuts):** [DOCUMENTATION.md](DOCUMENTATION.md) · **Product / automation / teaching narrative:** [PRODUCT_AUTOMATION.md](PRODUCT_AUTOMATION.md)
 
+**Quick start without typing `python -m …`:** from the repo root run `run.bat setup`, then `run.bat train`, then `run.bat serve` (Windows). On Unix use `./scripts/run.sh` with the same subcommands.
+
 End-to-end prototype for scoring **draft news text** before you publish it on your site: build a labeled dataset from **permissive public sources**, train **classical (TF–IDF + logistic regression)** and **TensorFlow/Keras** models (BiLSTM and a compact **multi-head attention** encoder), export **interpretable keyword hints**, and run a small CLI scorer.
 
 Reference portal you mentioned for human reading: [BBC Sport](https://www.bbc.com/sport).
@@ -76,7 +78,7 @@ pip install -e ".[dev]"
 |------|---------------------|------------|
 | **PEP 621 / `pyproject.toml`** | Declaring dependencies in one standard file; `pip install -e .` | `pip install -e ".[dev]"` |
 | **Invoke (`tasks.py`)** | Cross-platform task runners; same role as scripts, less shell pain on Windows | `invoke --list` then e.g. `invoke train`, `invoke serve`, `invoke lab` |
-| **Make (`Makefile`)** | Classic build automation; common in C/C++ and many data teams; maps to CI “jobs” | `make train`, `make serve`, `make lab` (needs `make` on PATH) |
+| **Make (`Makefile`)** | Classic build automation; maps to CI “jobs” | `make setup && make serve` for UI (no train); `make lab-train` only if retraining (needs `make` on PATH) |
 | **Raw modules** | What actually runs under the hood | `python -m src.pipeline.run_train` |
 
 **Invoke cheat-sheet** (after `pip install -e ".[dev]"`):
@@ -95,8 +97,9 @@ invoke lab                 # train-quick then serve (blocks on server)
 **Make** (Git Bash / WSL / macOS / Linux):
 
 ```bash
-make install && make train && make serve
-# or: make lab
+make setup && make serve
+# UI only (venv already ready): make install && make serve
+# Optional retrain later: make train   or   make lab-train
 ```
 
 **Optional — `uv` (fast installer, advanced):** [Astral uv](https://github.com/astral-sh/uv) can create a venv and sync deps in one step: `uv venv && uv pip install -e ".[dev]"`. Teach it as “pip, but faster and reproducible.”

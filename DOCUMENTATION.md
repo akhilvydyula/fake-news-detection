@@ -13,6 +13,21 @@ TensorFlow unpacks **very deep** paths. If `pip install` fails with **“No such
 
 The repository already includes a **`.venv`** folder in `.gitignore`; create it locally (commands below)—it is **not** committed to Git.
 
+### Launcher scripts (no `python -m …` by hand)
+
+From the **project root**:
+
+| Action | Windows | macOS / Linux / Git Bash |
+|--------|---------|---------------------------|
+| First-time venv + install | `run.bat setup` or `.\run.ps1 setup` | `chmod +x scripts/run.sh` then `./scripts/run.sh setup` |
+| Train (full) | `run.bat train` | `./scripts/run.sh train` |
+| Train (quick) | `run.bat train-quick` | `./scripts/run.sh train-quick` |
+| **Start dashboard + API** | `run.bat serve` or double-click `run.bat` (starts **serve**) | `./scripts/run.sh serve` |
+| Tests | `run.bat test` | `./scripts/run.sh test` |
+| Artifact check | `run.bat doctor` | `./scripts/run.sh doctor` |
+
+`run.bat` calls `run.ps1` with **Bypass** execution policy for that session. If `setup` fails on Windows, use **Python 3.11** (`py -3.11` available) or the manual venv steps in §1 below.
+
 ---
 
 ## 1. One-time setup
@@ -93,7 +108,7 @@ python -m src.pipeline.run_train --mlflow
 
 ## 3. Web app (API + friendly UI)
 
-**Terminal 1** — start the server:
+**Start the server:** `run.bat serve` / `.\run.ps1 serve` / `./scripts/run.sh serve`, **or**:
 
 ```bash
 python -m uvicorn src.api.main:app --reload --host 127.0.0.1 --port 8000
@@ -101,7 +116,7 @@ python -m uvicorn src.api.main:app --reload --host 127.0.0.1 --port 8000
 
 Then open:
 
-- **Product UI (dashboard, pricing, docs):** http://127.0.0.1:8000/ — analyzes via `POST /api/v1/analyze` (paste or `url` in JSON). Static assets live under `web/`.
+- **Product UI (dashboard, pricing, docs):** http://127.0.0.1:8000/ — analyzes via `POST /api/v1/analyze` (paste or `url` in JSON). Static assets live under `web/`. If the app is served under a subpath (reverse proxy), set `<html data-api-base="/your-prefix">` in `web/index.html` so the browser calls the correct API URLs.
 - **Legacy teacher UI:** http://127.0.0.1:8000/classic — original paste/URL flow (`/api/analyze`, `/api/analyze-url`).
 - **Interactive API docs:** http://127.0.0.1:8000/docs
 - **Health:** http://127.0.0.1:8000/api/health — includes `api_key_required`, `auth_mode` (`anonymous` \| `single` \| `multi`), `brand`, artifact flags, and `usage_endpoint`.
@@ -164,23 +179,27 @@ invoke mlflow-ui    # optional; separate terminal
 | **`make install`** | Upgrades `pip`, then `pip install -e ".[dev]"` | First time, or after pulling dependency changes. |
 | **`make train`** | `python -m src.pipeline.run_train` | Full pipeline: download/build data (~10k rows default) + train all models. |
 | **`make train-quick`** | `python -m src.pipeline.run_train --quick --skip-build` | Fast check: small run, **reuses** existing CSVs in `data/processed/`. |
-| **`make serve`** | Starts **FastAPI** + UI with reload on port **8000** | You want the browser UI at http://127.0.0.1:8000/ (train at least once first). |
+| **`make setup`** | Creates `.venv` if missing, then `pip install -e ".[dev]"` (Unix path) | One-step bootstrap on macOS / Linux / WSL / Git Bash. |
+| **`make serve`** | Starts **FastAPI** + UI with reload on port **8000** | Dashboard at http://127.0.0.1:8000/#dashboard (uses existing `artifacts/`). |
+| **`make dev`** / **`make ui`** | Same as **`make serve`** | Shorthand when you only care about the front end. |
 | **`make test`** | `pytest -q` | You changed code and want the same checks as CI. |
 | **`make doctor`** | `python -m src.pipeline.doctor` | Quick JSON report: model files + `web/` / `static/` index (no TF import). |
 | **`make mlflow-ui`** | `mlflow ui --backend-store-uri ./mlruns` | You ran training with `--mlflow` and want the experiment browser. |
-| **`make lab`** | Runs **`train-quick`** then **`serve`** (server runs until Ctrl+C) | Quick demo: refresh models on saved data, then open the app. |
+| **`make lab-train`** | Runs **`train-quick`** then **`serve`** | Only when you want a quick retrain before the app; not the default UI path. |
 
 **Custom Python:** `make PYTHON=python3.11 train` uses that interpreter for all targets.
 
 **Typical flows**
 
 ```bash
-make install && make train && make serve
+make setup && make serve
 ```
 
 ```bash
-make install && make lab
+make install && make serve
 ```
+
+(Optional later: `make train` or `make lab-train` when you need new model files.)
 
 Invoke equivalents: `invoke install`, `invoke train`, `invoke serve`, `invoke lab`, etc.
 

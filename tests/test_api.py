@@ -13,6 +13,14 @@ from src.config import ARTIFACTS
 client = TestClient(app)
 
 
+def test_platform_assets_served():
+    r = client.get("/assets/platform.js")
+    assert r.status_code == 200
+    assert "application/javascript" in (r.headers.get("content-type") or "")
+    r2 = client.get("/assets/platform.css")
+    assert r2.status_code == 200
+
+
 def test_health():
     r = client.get("/api/health")
     assert r.status_code == 200

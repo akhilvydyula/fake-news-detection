@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Literal
 
@@ -29,13 +30,28 @@ from src.service.predictor import (
     build_full_text,
     load_metrics_json,
     product_framing,
+    warm_classical_cache,
     _keyword_hints,
 )
 
 STATIC_DIR = PROJECT_ROOT / "static"
 WEB_DIR = PROJECT_ROOT / "web"
 
+# Only these filenames are served (avoid path traversal).
+_PLATFORM_ASSET_MEDIA: dict[str, str] = {
+    "platform.js": "application/javascript; charset=utf-8",
+    "platform.css": "text/css; charset=utf-8",
+}
+
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    warm_classical_cache()
+    yield
+
+
 app = FastAPI(
+    lifespan=_lifespan,
     title="News Trust Platform API",
     description="Detector management & triage API for newsrooms. v1 for secure integrations.",
     version="0.5.0",
@@ -44,10 +60,18 @@ app = FastAPI(
     openapi_url="/openapi.json",
 )
 
+_cors_origins = [o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",") if o.strip()]
+if not _cors_origins:
+    _cors_origins = ["*"]
+# Browsers reject Access-Control-Allow-Origin: * together with credentialed requests.
+_cors_credentials = os.environ.get("CORS_ALLOW_CREDENTIALS", "").lower() in ("1", "true", "yes")
+if any(o == "*" for o in _cors_origins):
+    _cors_credentials = False
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","),
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_credentials=_cors_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -77,6 +101,17 @@ class V1AnalyzeRequest(BaseModel):
     url: HttpUrl | None = None
     backend: Literal["classical", "bilstm", "mini_transformer"] = "classical"
     teacher_mode: bool = False
+
+
+@app.get("/assets/{asset_name}", include_in_schema=False)
+def serve_platform_asset(asset_name: str) -> FileResponse:
+    """Serve product UI JS/CSS explicitly so the dashboard always loads (mount order quirks)."""
+    if asset_name not in _PLATFORM_ASSET_MEDIA:
+        raise HTTPException(status_code=404, detail="Unknown asset")
+    path = WEB_DIR / "assets" / asset_name
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail=f"Missing file: {path.name} under web/assets/")
+    return FileResponse(path, media_type=_PLATFORM_ASSET_MEDIA[asset_name])
 
 
 @app.get("/api/health")
@@ -247,9 +282,6 @@ def classic_index() -> FileResponse:
         raise HTTPException(status_code=404, detail="legacy UI missing")
     return FileResponse(p)
 
-
-if (WEB_DIR / "assets").is_dir():
-    app.mount("/assets", StaticFiles(directory=str(WEB_DIR / "assets")), name="platform-assets")
 
 if STATIC_DIR.is_dir():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")

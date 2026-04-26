@@ -16,6 +16,8 @@ Requires-Dist: regex>=2024.0.0
 Requires-Dist: fastapi>=0.115.0
 Requires-Dist: uvicorn[standard]>=0.32.0
 Requires-Dist: pydantic>=2.0.0
+Requires-Dist: httpx>=0.27.0
+Requires-Dist: beautifulsoup4>=4.12.0
 Requires-Dist: mlflow>=2.16.0
 Provides-Extra: dev
 Requires-Dist: pytest>=8.0.0; extra == "dev"
@@ -23,7 +25,9 @@ Requires-Dist: invoke>=2.2.0; extra == "dev"
 
 # Fake news detection prototype
 
-**Step-by-step runbook (setup, train, UI, shortcuts):** [DOCUMENTATION.md](DOCUMENTATION.md)
+**Step-by-step runbook (setup, train, UI, shortcuts):** [DOCUMENTATION.md](DOCUMENTATION.md) · **Product / automation / teaching narrative:** [PRODUCT_AUTOMATION.md](PRODUCT_AUTOMATION.md)
+
+**Quick start without typing `python -m …`:** from the repo root run `run.bat setup`, then `run.bat train`, then `run.bat serve` (Windows). On Unix use `./scripts/run.sh` with the same subcommands.
 
 End-to-end prototype for scoring **draft news text** before you publish it on your site: build a labeled dataset from **permissive public sources**, train **classical (TF–IDF + logistic regression)** and **TensorFlow/Keras** models (BiLSTM and a compact **multi-head attention** encoder), export **interpretable keyword hints**, and run a small CLI scorer.
 
@@ -182,27 +186,31 @@ Training writes **`artifacts/metrics.json`**: classical **train / val / test** p
 - **Underfitting:** both train and validation metrics are low → richer features, more data, or a stronger model may help.
 - **ROC-AUC** is on a **0–1** scale (e.g. **0.99** means 99% AUC, not “19%”). Compare **validation vs test** AUC to see if the hold-out is stable.
 
-## CI / CD and security scanning (GitHub)
+## CI / CD and security scanning
+
+**GitLab:** GitLab **ignores** `.github/workflows/`. Use [`.gitlab-ci.yml`](.gitlab-ci.yml) at the repo root. If no pipeline appears, see **[GITLAB.md](GITLAB.md)** (default branch, shared runners, `glab` vs `gitlab-runner`, local commands).
+
+### GitHub
 
 Workflows under [`.github/workflows/`](.github/workflows/) run on push and pull requests to `main` or `master`.
 
 | Workflow | Purpose | GitLab analogy (conceptual) |
 |----------|---------|-----------------------------|
-| [`ci.yml`](.github/workflows/ci.yml) | **Test** (pytest + import smoke), **Bandit** SAST with SARIF upload, **pip-audit** dependency report + artifact | `test` job + `SAST` / `dependency_scanning` |
+| [`ci.yml`](.github/workflows/ci.yml) | **Test** (pytest + import smoke), **Bandit** SAST + JSON artifact, **pip-audit** dependency report + artifact | `test` job + `SAST` / `dependency_scanning` |
 | [`codeql.yml`](.github/workflows/codeql.yml) | **CodeQL** semantic analysis (Python) | Advanced SAST / security scanning |
 | [`dependabot.yml`](.github/dependabot.yml) | Weekly PRs to bump **pip** + **GitHub Actions** deps | Dependency bot / Renovate |
 
 **Where to look when debugging**
 
 - **Actions** tab → failed job → expand steps; Bandit prints file/line; pip-audit prints vulnerable packages.
-- **Security** tab → **Code scanning** (CodeQL + Bandit SARIF once enabled for the repo).
+- **Security** tab → **Code scanning** for **CodeQL** (enable for the repo). Bandit results: **`bandit-results`** workflow artifact (JSON).
 - **pip-audit** uploads a **`pip-audit-results`** artifact (JSON) even when the job is non-blocking.
 
 **Policy knobs**
 
 - **Bandit:** configured in [`bandit.yaml`](bandit.yaml). Medium+ severity fails the `sast-bandit` job; tune skips there with care.
 - **pip-audit:** the audit step uses `continue-on-error: true` by default so TensorFlow-heavy stacks do not block every class PR. To **block merges** on known CVEs, edit `ci.yml` and remove `continue-on-error: true` from the pip-audit step (and triage with `pip-audit --ignore-vuln …` only when justified).
-- **Fork PRs:** SARIF upload to the base repo may be restricted by GitHub for untrusted forks; see [GitHub docs on code scanning and pull requests](https://docs.github.com/en/code-security/code-scanning/creating-an-advanced-setup-for-code-scanning/configuring-advanced-setup-for-code-scanning#considerations-for-private-repositories-and-forks).
+- **Fork PRs:** Code scanning uploads may be restricted for untrusted forks; see [GitHub docs on code scanning and pull requests](https://docs.github.com/en/code-security/code-scanning/creating-an-advanced-setup-for-code-scanning/configuring-advanced-setup-for-code-scanning#considerations-for-private-repositories-and-forks).
 
 Local parity:
 
@@ -219,6 +227,7 @@ pip install -e ".[dev]"; pip-audit --desc off
 |----------|---------|
 | [`notebooks/01_teaching_walkthrough.ipynb`](notebooks/01_teaching_walkthrough.ipynb) | Load data, run predictions, show per-article explanations |
 | [`notebooks/02_metrics_and_overfitting.ipynb`](notebooks/02_metrics_and_overfitting.ipynb) | Read `metrics.json`, compare splits, discuss AUC |
+| [`notebooks/03_automation_product_and_model_zoo.ipynb`](notebooks/03_automation_product_and_model_zoo.ipynb) | Unseen-data triage, model tiers (classical → LLM), exercises |
 
 ## Data and labels
 

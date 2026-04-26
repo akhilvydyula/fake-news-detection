@@ -9,8 +9,10 @@ from typing import Any, Literal
 
 import joblib
 import numpy as np
-import tensorflow as tf
 from sklearn.pipeline import Pipeline
+
+# TensorFlow is imported only inside _keras_model(). Importing tf at module load
+# adds tens of seconds to minutes on Windows and blocks classical (sklearn) inference.
 
 from src.config import ARTIFACTS
 from src.data.preprocess import combine_title_body
@@ -26,6 +28,11 @@ def _load_classical_pipeline() -> Pipeline | None:
     return joblib.load(path)
 
 
+def warm_classical_cache() -> None:
+    """Load the cached classical sklearn pipeline once (no TensorFlow)."""
+    _load_classical_pipeline()
+
+
 @lru_cache(maxsize=1)
 def _keyword_hints() -> dict[str, Any]:
     path = ARTIFACTS / "classical" / "keyword_hints.json"
@@ -34,10 +41,15 @@ def _keyword_hints() -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _keras_model(kind: str) -> tf.keras.Model | None:
+def _keras_model(kind: str) -> Any:
     path = ARTIFACTS / f"keras_{kind}" / "model.keras"
     if not path.is_file():
         return None
+    import os
+
+    os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
+    import tensorflow as tf
+
     return tf.keras.models.load_model(path)
 
 

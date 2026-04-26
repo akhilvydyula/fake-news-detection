@@ -1,56 +1,27 @@
 (function () {
   "use strict";
 
-  const pages = document.querySelectorAll("[data-page]");
-  const navLinks = document.querySelectorAll(".nav-links a[data-page]");
-  const brandLogo = document.getElementById("brand-logo");
-  const footerBrand = document.getElementById("footer-brand");
-  const heroTitle = document.getElementById("hero-title");
-
-  function showPage(name) {
-    pages.forEach((el) => {
-      const p = el.getAttribute("data-page");
-      if (el.classList.contains("page")) {
-        el.classList.toggle("active", p === name);
-      }
-    });
-    navLinks.forEach((a) => {
-      a.classList.toggle("active", a.getAttribute("data-page") === name);
-    });
+  /** Prefix for API when app is mounted under a subpath (set <html data-api-base="/myapp">). */
+  function apiUrl(path) {
+    var base = (document.documentElement.getAttribute("data-api-base") || "").replace(/\/$/, "");
+    if (!path.startsWith("/")) path = "/" + path;
+    return base + path;
   }
 
-  function routeFromHash() {
-    const h = (location.hash || "#home").replace("#", "") || "home";
-    const allowed = ["home", "dashboard", "pricing", "docs", "security"];
-    showPage(allowed.includes(h) ? h : "home");
-  }
-
-  window.addEventListener("hashchange", routeFromHash);
-
-  navLinks.forEach((a) => {
-    a.addEventListener("click", (e) => {
-      const p = a.getAttribute("data-page");
-      if (p) {
-        e.preventDefault();
-        location.hash = "#" + p;
-      }
-    });
-  });
-
-  document.querySelector(".logo")?.addEventListener("click", (e) => {
-    e.preventDefault();
-    location.hash = "#home";
-  });
+  var brandLogo = document.getElementById("brand-logo");
+  var footerBrand = document.getElementById("footer-brand");
+  var heroBrandLine = document.getElementById("hero-brand-line");
 
   async function loadHealth() {
     try {
-      const r = await fetch("/api/health");
+      var r = await fetch(apiUrl("/api/health"));
       if (!r.ok) return;
-      const j = await r.json();
-      const brand = j.brand || "News Trust Platform";
+      var j = await r.json();
+      var brand = j.brand || "News Trust Platform";
       if (footerBrand) footerBrand.textContent = brand;
+      if (heroBrandLine) heroBrandLine.textContent = brand;
       if (brandLogo) {
-        const parts = brand.trim().split(/\s+/);
+        var parts = brand.trim().split(/\s+/);
         if (parts.length >= 2) {
           brandLogo.innerHTML =
             escapeHtml(parts.slice(0, -1).join(" ")) +
@@ -61,16 +32,13 @@
           brandLogo.textContent = brand;
         }
       }
-      if (heroTitle && j.brand && j.brand !== "News Trust Platform") {
-        heroTitle.textContent = brand + " — triage news before you trust it";
-      }
     } catch (_) {
-      /* offline demo */
+      /* offline or wrong api base */
     }
   }
 
   function escapeHtml(s) {
-    const d = document.createElement("div");
+    var d = document.createElement("div");
     d.textContent = s;
     return d.innerHTML;
   }
@@ -79,31 +47,72 @@
     return String(s).replace(/\*\*/g, "");
   }
 
-  const modeRadios = document.querySelectorAll('input[name="mode"]');
-  const pasteFields = document.getElementById("paste-fields");
-  const urlFields = document.getElementById("url-fields");
+  function formatErrorDetail(detail, status) {
+    if (detail == null) return "Request failed (" + status + ")";
+    if (typeof detail === "string") return detail;
+    if (Array.isArray(detail)) {
+      return detail
+        .map(function (e) {
+          if (!e || typeof e !== "object") return JSON.stringify(e);
+          var loc = e.loc ? e.loc.join(".") : "";
+          var msg = e.msg || e.message || JSON.stringify(e);
+          return loc ? msg + " (" + loc + ")" : msg;
+        })
+        .join("; ");
+    }
+    return JSON.stringify(detail);
+  }
 
-  modeRadios.forEach((r) => {
-    r.addEventListener("change", () => {
-      const url = r.value === "url";
+  /** Same article as scripts/smoke_analyze.py (paste mode, meets min length). */
+  var SAMPLE_ARTICLE = {
+    title: "City sample: council approves transit plan after debate",
+    body:
+      "Residents filled the chamber as officials voted in favor of the downtown connector. " +
+      "The mayor said work could start next year if federal funds arrive. " +
+      "Critics asked for stronger parking and accessibility measures near stations.",
+  };
+
+  var modeRadios = document.querySelectorAll('#analyze-form input[name="mode"]');
+  var pasteFields = document.getElementById("paste-fields");
+  var urlFields = document.getElementById("url-fields");
+
+  modeRadios.forEach(function (r) {
+    r.addEventListener("change", function () {
+      var url = r.value === "url";
       if (pasteFields) pasteFields.style.display = url ? "none" : "";
       if (urlFields) urlFields.style.display = url ? "" : "none";
     });
   });
 
-  const btn = document.getElementById("btn-analyze");
-  const errEl = document.getElementById("analyze-err");
-  const resultsPlaceholder = document.getElementById("results-placeholder");
-  const resultsContent = document.getElementById("results-content");
-  const ringsEl = document.getElementById("rings");
-  const signalCardsEl = document.getElementById("signal-cards");
-  const summaryBox = document.getElementById("summary-box");
-  const summaryText = document.getElementById("summary-text");
-  const framingEl = document.getElementById("product-framing");
+  var analyzeForm = document.getElementById("analyze-form");
+  var errEl = document.getElementById("analyze-err");
+  var resultsPlaceholder = document.getElementById("results-placeholder");
+  var resultsContent = document.getElementById("results-content");
+  var ringsEl = document.getElementById("rings");
+  var signalCardsEl = document.getElementById("signal-cards");
+  var summaryBox = document.getElementById("summary-box");
+  var summaryText = document.getElementById("summary-text");
+  var framingEl = document.getElementById("product-framing");
+  var resultsPanel = document.getElementById("results-panel");
+  var analyzeStatusEl = document.getElementById("analyze-status");
+  var analysisResultsAnchor = document.getElementById("analysis-results");
+
+  function setAnalyzeStatus(text, kind) {
+    if (!analyzeStatusEl) return;
+    if (!text) {
+      analyzeStatusEl.textContent = "";
+      analyzeStatusEl.hidden = true;
+      analyzeStatusEl.className = "analyze-status";
+      return;
+    }
+    analyzeStatusEl.textContent = text;
+    analyzeStatusEl.hidden = false;
+    analyzeStatusEl.className = "analyze-status" + (kind === "ok" ? " analyze-status-ok" : kind === "err" ? " analyze-status-err" : "");
+  }
 
   function ringCard(label, value, caption) {
-    const pct = Math.max(0, Math.min(100, Math.round(Number(value) * 100)));
-    let color = "var(--ok)";
+    var pct = Math.max(0, Math.min(100, Math.round(Number(value) * 100)));
+    var color = "var(--ok)";
     if (pct >= 55) color = "var(--danger)";
     else if (pct >= 35) color = "var(--warn)";
     return (
@@ -126,14 +135,15 @@
   }
 
   function renderResults(data) {
+    setAnalyzeStatus("Analysis complete — scores and signals are below.", "ok");
     if (resultsPlaceholder) resultsPlaceholder.hidden = true;
     if (resultsContent) resultsContent.hidden = false;
 
-    const plat = data.platform || {};
-    const dims = plat.dimensions || {};
+    var plat = data.platform || {};
+    var dims = plat.dimensions || {};
 
     if (summaryText && summaryBox) {
-      const sum = plat.article_summary || "";
+      var sum = plat.article_summary || "";
       if (sum) {
         summaryText.textContent = sum;
         summaryBox.hidden = false;
@@ -146,30 +156,38 @@
       ringsEl.innerHTML =
         ringCard(
           "Misinformation-style",
-          dims.misinformation_style_0_to_1 ?? data.score_toward_review_0_to_1,
+          dims.misinformation_style_0_to_1 != null
+            ? dims.misinformation_style_0_to_1
+            : data.score_toward_review_0_to_1,
           "Pattern vs. training labels (not fact-check).",
         ) +
         ringCard(
           "AI-style (experimental)",
-          dims.ai_text_experimental_0_to_1 ?? 0,
-          plat.ai_style_block?.disclaimer || "Heuristic only.",
+          dims.ai_text_experimental_0_to_1 != null ? dims.ai_text_experimental_0_to_1 : 0,
+          (plat.ai_style_block && plat.ai_style_block.disclaimer) || "Heuristic only.",
         ) +
         ringCard(
           "Composite attention",
-          dims.composite_attention_0_to_1 ?? data.score_toward_review_0_to_1,
+          dims.composite_attention_0_to_1 != null
+            ? dims.composite_attention_0_to_1
+            : data.score_toward_review_0_to_1,
           "Combined triage signal for queues.",
         );
     }
 
     if (signalCardsEl) {
-      const cards = plat.signal_cards || plat.agents || [];
+      var cards = plat.signal_cards || plat.agents || [];
       signalCardsEl.innerHTML = cards
-        .map((a) => {
-          const pct = Math.round((a.score_0_to_1 || 0) * 100);
-          const signals = (a.signals || []).slice(0, 2);
-          const sigHtml = signals.length
+        .map(function (a) {
+          var pct = Math.round((a.score_0_to_1 || 0) * 100);
+          var signals = (a.signals || []).slice(0, 2);
+          var sigHtml = signals.length
             ? "<p>" +
-              signals.map((s) => escapeHtml(s)).join(" ") +
+              signals
+                .map(function (s) {
+                  return escapeHtml(s);
+                })
+                .join(" ") +
               "</p>"
             : "";
           return (
@@ -195,33 +213,49 @@
     }
 
     if (framingEl && data.product_framing) {
-      const pf = data.product_framing;
+      var pf = data.product_framing;
       framingEl.innerHTML = Object.keys(pf)
-        .map(
-          (k) =>
+        .map(function (k) {
+          return (
             "<p><strong>" +
             escapeHtml(k.replace(/_/g, " ")) +
             ":</strong> " +
             escapeHtml(stripMdBold(pf[k])) +
-            "</p>",
-        )
+            "</p>"
+          );
+        })
         .join("");
+    }
+
+    var scrollTarget = analysisResultsAnchor || resultsPanel;
+    if (scrollTarget && scrollTarget.scrollIntoView) {
+      try {
+        scrollTarget.scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch (_) {
+        scrollTarget.scrollIntoView(true);
+      }
     }
   }
 
-  btn?.addEventListener("click", async () => {
+  function runAnalyze(submitBtn) {
+    if (!analyzeForm) return;
+
     if (errEl) {
       errEl.hidden = true;
       errEl.textContent = "";
     }
 
-    const mode = document.querySelector('input[name="mode"]:checked')?.value || "paste";
-    const backend = document.getElementById("backend")?.value || "classical";
-    const apiKey = document.getElementById("apiKey")?.value?.trim() || "";
+    var mode =
+      (analyzeForm.querySelector('input[name="mode"]:checked') || {}).value || "paste";
+    var backendEl = document.getElementById("backend");
+    var backend = (backendEl && backendEl.value) || "classical";
+    var apiKeyEl = document.getElementById("apiKey");
+    var apiKey = (apiKeyEl && apiKeyEl.value && apiKeyEl.value.trim()) || "";
 
-    const payload = { backend, teacher_mode: false };
+    var payload = { backend: backend, teacher_mode: false };
     if (mode === "url") {
-      const url = document.getElementById("url")?.value?.trim();
+      var urlEl = document.getElementById("url");
+      var url = (urlEl && urlEl.value && urlEl.value.trim()) || "";
       if (!url) {
         if (errEl) {
           errEl.textContent = "Enter a URL.";
@@ -231,49 +265,210 @@
       }
       payload.url = url;
     } else {
-      payload.title = document.getElementById("title")?.value || "";
-      payload.body = document.getElementById("body")?.value || "";
-    }
-
-    const headers = { "Content-Type": "application/json" };
-    if (apiKey) headers["X-API-Key"] = apiKey;
-
-    btn.disabled = true;
-    try {
-      const r = await fetch("/api/v1/analyze", {
-        method: "POST",
-        headers,
-        body: JSON.stringify(payload),
-      });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) {
-        const msg = data.detail || r.statusText || "Request failed";
+      var titleEl = document.getElementById("title");
+      var bodyEl = document.getElementById("article-body");
+      payload.title = (titleEl && titleEl.value) || "";
+      payload.body = (bodyEl && bodyEl.value) || "";
+      var combined = (payload.title + "\n" + payload.body).trim();
+      if (combined.length < 20) {
         if (errEl) {
-          errEl.textContent = typeof msg === "string" ? msg : JSON.stringify(msg);
+          errEl.textContent =
+            "Text is too short — add a headline and at least a short paragraph (about 20+ characters total), or click Load sample.";
           errEl.hidden = false;
+          errEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
         }
+        setAnalyzeStatus("", null);
         return;
       }
-      renderResults(data);
-    } catch (e) {
-      if (errEl) {
-        errEl.textContent = String(e.message || e);
-        errEl.hidden = false;
-      }
-    } finally {
-      btn.disabled = false;
     }
-  });
+
+    var headers = { "Content-Type": "application/json" };
+    if (apiKey) headers["X-API-Key"] = apiKey;
+
+    var prevBtnText = "";
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      prevBtnText = submitBtn.textContent || "";
+      submitBtn.textContent = "Analyzing…";
+    }
+    var t0 = Date.now();
+    var statusTick = setInterval(function () {
+      var s = Math.floor((Date.now() - t0) / 1000);
+      setAnalyzeStatus("Analyzing… (" + s + "s)", null);
+    }, 500);
+    setAnalyzeStatus("Analyzing… (0s)", null);
+    if (analysisResultsAnchor && analysisResultsAnchor.scrollIntoView) {
+      try {
+        analysisResultsAnchor.scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch (_) {
+        analysisResultsAnchor.scrollIntoView(true);
+      }
+    }
+
+    var analyzeTimeoutMs = 120000;
+    var abortCtrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+    var abortTimer =
+      abortCtrl &&
+      setTimeout(function () {
+        try {
+          abortCtrl.abort();
+        } catch (_) {}
+      }, analyzeTimeoutMs);
+
+    fetch(apiUrl("/api/v1/analyze"), {
+      method: "POST",
+      headers: headers,
+      body: JSON.stringify(payload),
+      signal: abortCtrl ? abortCtrl.signal : undefined,
+    })
+      .then(function (r) {
+        return r.text().then(function (text) {
+          var data = {};
+          if (text) {
+            try {
+              data = JSON.parse(text);
+            } catch (_) {
+              data = { detail: text.slice(0, 400) || "Non-JSON response (" + r.status + ")" };
+            }
+          }
+          return { ok: r.ok, status: r.status, data: data };
+        });
+      })
+      .then(function (res) {
+        if (!res.ok) {
+          var msg = formatErrorDetail(res.data && res.data.detail, res.status);
+          if (res.status === 401) {
+            msg +=
+              " If this server requires a key, paste it into “API key” below and try again.";
+          }
+          setAnalyzeStatus("Request failed — see message under the button.", "err");
+          if (errEl) {
+            errEl.textContent = msg;
+            errEl.hidden = false;
+            errEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          }
+          return;
+        }
+        try {
+          renderResults(res.data);
+        } catch (e2) {
+          setAnalyzeStatus("Could not render results.", "err");
+          if (errEl) {
+            errEl.textContent = "Could not render results: " + String((e2 && e2.message) || e2);
+            errEl.hidden = false;
+            errEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          }
+        }
+      })
+      .catch(function (e) {
+        var aborted = e && (e.name === "AbortError" || /aborted/i.test(String(e.message || "")));
+        setAnalyzeStatus(aborted ? "Timed out waiting for the server." : "Network error — start the server from the project root.", "err");
+        if (errEl) {
+          errEl.textContent = aborted
+            ? "No response after " +
+              Math.round(analyzeTimeoutMs / 1000) +
+              "s. Use “Classical” if you picked a Keras backend (first neural run loads TensorFlow). Check the terminal for errors."
+            : "Network error — is the API running? " + String((e && e.message) || e);
+          errEl.hidden = false;
+          errEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+      })
+      .finally(function () {
+        if (statusTick) {
+          clearInterval(statusTick);
+          statusTick = null;
+        }
+        if (abortTimer) clearTimeout(abortTimer);
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          if (prevBtnText) submitBtn.textContent = prevBtnText;
+        }
+      });
+  }
+
+  var btnAnalyze = document.getElementById("btn-analyze");
+  function triggerAnalyze(e) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    runAnalyze(btnAnalyze);
+  }
+  if (analyzeForm) {
+    analyzeForm.addEventListener("submit", triggerAnalyze, true);
+    analyzeForm.addEventListener("keydown", function (e) {
+      if (e.key !== "Enter") return;
+      if (!e.ctrlKey && !e.metaKey) return;
+      var t = e.target;
+      if (!t || t.id !== "article-body") return;
+      e.preventDefault();
+      runAnalyze(btnAnalyze);
+    });
+  }
+
+  var loadSampleBtn = document.getElementById("btn-load-sample");
+  if (loadSampleBtn) {
+    loadSampleBtn.addEventListener("click", function () {
+      var pasteRadio = analyzeForm && analyzeForm.querySelector('input[name="mode"][value="paste"]');
+      if (pasteRadio) {
+        pasteRadio.checked = true;
+        pasteRadio.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      if (pasteFields) pasteFields.style.display = "";
+      if (urlFields) urlFields.style.display = "none";
+      var tEl = document.getElementById("title");
+      var bEl = document.getElementById("article-body");
+      if (tEl) tEl.value = SAMPLE_ARTICLE.title;
+      if (bEl) bEl.value = SAMPLE_ARTICLE.body;
+      if (errEl) {
+        errEl.hidden = true;
+        errEl.textContent = "";
+      }
+      requestAnimationFrame(function () {
+        runAnalyze(btnAnalyze);
+      });
+    });
+  }
+
+  function maybeDemoRunFromQuery() {
+    try {
+      var params = new URLSearchParams(location.search || "");
+      if (params.get("demo") !== "1" || !analyzeForm) return;
+      if (!location.hash || location.hash === "#" || location.hash === "#home") {
+        location.hash = "#dashboard";
+      }
+      setTimeout(function () {
+        var pasteRadio = analyzeForm.querySelector('input[name="mode"][value="paste"]');
+        if (pasteRadio) {
+          pasteRadio.checked = true;
+          pasteRadio.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+        if (pasteFields) pasteFields.style.display = "";
+        if (urlFields) urlFields.style.display = "none";
+        var tEl = document.getElementById("title");
+        var bEl = document.getElementById("article-body");
+        if (tEl) tEl.value = SAMPLE_ARTICLE.title;
+        if (bEl) bEl.value = SAMPLE_ARTICLE.body;
+        if (errEl) {
+          errEl.hidden = true;
+          errEl.textContent = "";
+        }
+        runAnalyze(btnAnalyze);
+      }, 50);
+    } catch (_) {}
+  }
 
   function fillCurlExamples() {
-    const origin = location.origin || "";
-    const paste = document.getElementById("curl-paste");
-    const url = document.getElementById("curl-url");
-    const usage = document.getElementById("curl-usage");
+    var origin = location.origin || "";
+    var base = (document.documentElement.getAttribute("data-api-base") || "").replace(/\/$/, "");
+    var root = origin + base;
+    var paste = document.getElementById("curl-paste");
+    var url = document.getElementById("curl-url");
+    var usage = document.getElementById("curl-usage");
     if (paste) {
       paste.textContent =
         'curl -sS -X POST "' +
-        origin +
+        root +
         '/api/v1/analyze" \\\n' +
         '  -H "Content-Type: application/json" \\\n' +
         '  -d \'{"title":"Headline","body":"First sentence. Second sentence with enough length for analysis.",' +
@@ -282,7 +477,7 @@
     if (url) {
       url.textContent =
         'curl -sS -X POST "' +
-        origin +
+        root +
         '/api/v1/analyze" \\\n' +
         '  -H "Content-Type: application/json" \\\n' +
         '  -d \'{"url":"https://example.com/article","backend":"classical"}\'';
@@ -290,13 +485,21 @@
     if (usage) {
       usage.textContent =
         'curl -sS "' +
-        origin +
+        root +
         '/api/v1/usage?days=30" \\\n' +
         '  -H "X-API-Key: YOUR_KEY"';
     }
   }
 
-  routeFromHash();
-  loadHealth();
-  fillCurlExamples();
+  function init() {
+    loadHealth();
+    fillCurlExamples();
+    maybeDemoRunFromQuery();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
 })();
