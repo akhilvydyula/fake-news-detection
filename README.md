@@ -1,6 +1,6 @@
 # Fake news detection prototype
 
-**Step-by-step runbook (setup, train, UI, shortcuts):** [DOCUMENTATION.md](DOCUMENTATION.md)
+**Step-by-step runbook (setup, train, UI, shortcuts):** [DOCUMENTATION.md](DOCUMENTATION.md) · **Product / automation / teaching narrative:** [PRODUCT_AUTOMATION.md](PRODUCT_AUTOMATION.md)
 
 End-to-end prototype for scoring **draft news text** before you publish it on your site: build a labeled dataset from **permissive public sources**, train **classical (TF–IDF + logistic regression)** and **TensorFlow/Keras** models (BiLSTM and a compact **multi-head attention** encoder), export **interpretable keyword hints**, and run a small CLI scorer.
 
@@ -200,6 +200,7 @@ pip install -e ".[dev]"; pip-audit --desc off
 |----------|---------|
 | [`notebooks/01_teaching_walkthrough.ipynb`](notebooks/01_teaching_walkthrough.ipynb) | Load data, run predictions, show per-article explanations |
 | [`notebooks/02_metrics_and_overfitting.ipynb`](notebooks/02_metrics_and_overfitting.ipynb) | Read `metrics.json`, compare splits, discuss AUC |
+| [`notebooks/03_automation_product_and_model_zoo.ipynb`](notebooks/03_automation_product_and_model_zoo.ipynb) | Unseen-data triage, model tiers (classical → LLM), exercises |
 
 ## Data and labels
 

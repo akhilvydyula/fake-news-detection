@@ -141,6 +141,92 @@ def load_metrics_json() -> dict[str, Any] | None:
     return json.loads(p.read_text(encoding="utf-8"))
 
 
+def _executive_why(summary: dict[str, str], top_phrases: list[dict[str, Any]]) -> str:
+    """Short “why” blurb for UI and automation dashboards."""
+    bits = [summary["headline"], summary["detail"][:280] + ("…" if len(summary["detail"]) > 280 else "")]
+    if top_phrases:
+        toward = [p["phrase"] for p in top_phrases[:4] if p.get("effect") == "pushes_toward_review"]
+        away = [p["phrase"] for p in top_phrases[:4] if p.get("effect") == "pushes_toward_reliable"]
+        if toward:
+            bits.append("Phrases that nudged toward review (statistical): " + ", ".join(toward[:5]) + ".")
+        if away:
+            bits.append("Phrases that nudged toward reliable (statistical): " + ", ".join(away[:5]) + ".")
+    return " ".join(bits)
+
+
+def product_framing() -> dict[str, str]:
+    """Stable copy for APIs and teaching: what automation is for."""
+    return {
+        "automation_role": (
+            "Machine learning here automates **triage**: it ranks unseen articles so reviewers spend time "
+            "on higher-risk items first. It does not replace humans for truth, law, or ethics."
+        ),
+        "what_models_measure": (
+            "Models estimate similarity in **language patterns** to articles labeled reliable vs. needs-review "
+            "in training data—not whether claims match reality. A human-written true story can score “review” "
+            "if it resembles clickbait in the corpus; LLM-generated text can score “reliable” if it mimics wire style."
+        ),
+        "llm_generated_content": (
+            "Detecting “written by AI” is a **different** problem from misinformation. You may add separate "
+            "detectors or watermarking policies; this stack is trained for **misleading-style vs. mainstream-news-style** "
+            "labels on a specific dataset, not universal AI authorship detection."
+        ),
+        "scaling_review": (
+            "At high volume, use thresholds: e.g. auto-publish only below 0.3 “review” score, queue 0.3–0.5 for spot-check, "
+            "require full fact-check above 0.5. Tune using your own labeled data and legal/compliance rules."
+        ),
+    }
+
+
+def build_api_response(text: str, backend: Backend, teacher_mode: bool) -> dict[str, Any] | None:
+    """Full JSON payload for /api/analyze and /api/analyze-url."""
+    p = predict_proba_fake(text, backend)
+    if p is None:
+        return None
+    summary = user_friendly_summary(p)
+    phrases = (
+        explain_classical_for_text(text, top_k=12)
+        if backend == "classical"
+        else [
+            {
+                "phrase": "(Use “Fast explanation” model for word-level reasons.)",
+                "effect": "pushes_toward_review",
+                "strength": 0.0,
+            }
+        ]
+    )
+    response: dict[str, Any] = {
+        "score_toward_review_0_to_1": round(p, 4),
+        "user_summary": summary,
+        "interpretability": {
+            "plain_explanation": (
+                "We highlight words and phrases from your text that most moved the linear model toward "
+                "“review” or “reliable,” based on weights learned from training data. "
+                "This is not a list of lies—only statistical cues."
+            ),
+            "phrases_in_your_text": phrases,
+        },
+        "product_framing": product_framing(),
+        "executive_why": _executive_why(summary, phrases if backend == "classical" else []),
+    }
+
+    if teacher_mode:
+        metrics = load_metrics_json()
+        if metrics and "classical" in metrics:
+            c = metrics["classical"]
+            response["teacher"] = {
+                "test_set": c.get("test"),
+                "validation_set": c.get("val"),
+                "train_set": c.get("train"),
+                "note": (
+                    "Precision = of all drafts flagged “review,” how many were truly in the review class in the dataset. "
+                    "Recall = of all truly questionable items in the dataset, how many we caught. "
+                    "Compare train vs val AUC in training_metrics to spot overfitting."
+                ),
+            }
+    return response
+
+
 def clear_model_cache() -> None:
     _load_classical_pipeline.cache_clear()
     _keyword_hints.cache_clear()

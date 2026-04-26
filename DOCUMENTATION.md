@@ -101,11 +101,13 @@ python -m uvicorn src.api.main:app --reload --host 127.0.0.1 --port 8000
 
 Then open:
 
-- **UI:** http://127.0.0.1:8000/
+- **UI:** http://127.0.0.1:8000/ — choose **Paste text** or **Article URL** (URL mode calls `POST /api/analyze-url`; only use sites you may access).
 - **Interactive API docs:** http://127.0.0.1:8000/docs
 - **Health:** http://127.0.0.1:8000/api/health
 
 If `503` on analyze, train first (step 2) so `artifacts/` exists.
+
+**JSON API for unseen URL workflow:** `POST /api/analyze-url` with body `{"url":"https://...","backend":"classical","teacher_mode":false}`.
 
 ---
 

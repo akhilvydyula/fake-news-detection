@@ -15,19 +15,28 @@
       <p class="eyebrow">Editorial decision support</p>
       <h1>Is this draft worth a <span class="accent">second look</span>?</h1>
       <p class="lede">
-        Paste a headline and a short excerpt. We compare your text to patterns from a research dataset—
-        <strong>not</strong> to the real world. We never replace fact-checking or your judgment.
+        Score <strong>unseen</strong> articles for <strong>triage</strong>: paste text or fetch a public page (where you have permission).
+        The model estimates “needs review” from language patterns in training data—<strong>not</strong> ground truth or fact checks.
+        Human review stays in the loop for anything sensitive.
       </p>
     </header>
 
     <main class="grid">
       <section class="card form-card">
         <h2>Your draft</h2>
-        <label class="field">
+        <div class="tabs" role="tablist">
+          <label class="tab"><input type="radio" name="inputmode" value="paste" checked /> Paste text</label>
+          <label class="tab"><input type="radio" name="inputmode" value="url" /> Article URL</label>
+        </div>
+        <label class="field" id="url-row" hidden>
+          <span>Page URL (HTML; no paywalled/JS-only pages)</span>
+          <input id="url" type="url" maxlength="2048" placeholder="https://example.com/news/story" />
+        </label>
+        <label class="field paste-only">
           <span>Headline</span>
           <input id="title" type="text" maxlength="500" placeholder="e.g. City council approves new stadium funding" />
         </label>
-        <label class="field">
+        <label class="field paste-only">
           <span>Article text (first few paragraphs are enough)</span>
           <textarea id="body" rows="10" maxlength="50000" placeholder="Paste the opening paragraphs here…"></textarea>
         </label>
@@ -60,12 +69,22 @@
         <p id="scale-note" class="muted small">—</p>
 
         <div class="explain">
+          <h3>Why this score? (plain summary)</h3>
+          <p id="executive-why" class="detail small">—</p>
+        </div>
+
+        <div class="explain">
           <h3>What influenced this score?</h3>
           <p class="muted small">
             These are phrases <em>in your text</em> that pushed the fast model toward “review” or “reliable.”
-            They are statistical—not proof something is false or true.
+            They are statistical—not proof something is false or true. <strong>AI-written</strong> and <strong>fake</strong> are not the same problem.
           </p>
           <ul id="phrases" class="phrase-list"></ul>
+        </div>
+
+        <div id="framing-panel" class="framing" hidden>
+          <h3>How ML fits your product (automation)</h3>
+          <ul id="framing-list" class="framing-list"></ul>
         </div>
 
         <div id="teacher-panel" class="teacher" hidden>

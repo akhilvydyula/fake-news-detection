@@ -6,20 +6,21 @@ import os
 from pathlib import Path
 from typing import Any, Literal
 
+import httpx
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, HttpUrl
 
 from src.config import PROJECT_ROOT
+from src.ingest.fetch_url import fetch_url_text
 from src.service.predictor import (
     artifacts_ready,
+    build_api_response,
     build_full_text,
-    explain_classical_for_text,
     load_metrics_json,
-    predict_proba_fake,
-    user_friendly_summary,
+    product_framing,
     _keyword_hints,
 )
 
@@ -28,7 +29,7 @@ STATIC_DIR = PROJECT_ROOT / "static"
 app = FastAPI(
     title="News draft helper",
     description="Decision support for editors—not a fact checker. Plain language for readers; optional teacher metrics.",
-    version="0.2.0",
+    version="0.3.0",
 )
 
 app.add_middleware(
@@ -50,6 +51,12 @@ class AnalyzeRequest(BaseModel):
     )
 
 
+class AnalyzeUrlRequest(BaseModel):
+    url: HttpUrl
+    backend: Literal["classical", "bilstm", "mini_transformer"] = "classical"
+    teacher_mode: bool = False
+
+
 @app.get("/api/health")
 def health() -> dict[str, Any]:
     ready = artifacts_ready()
@@ -65,6 +72,7 @@ def model_info(teacher_mode: bool = False) -> dict[str, Any]:
             "This tool compares your draft to patterns in a research dataset. "
             "It does not verify facts, names, or dates. Always use normal journalism checks."
         ),
+        "product_framing": product_framing(),
         "artifacts": artifacts_ready(),
     }
     if teacher_mode and metrics:
@@ -82,52 +90,49 @@ def model_info(teacher_mode: bool = False) -> dict[str, Any]:
 def analyze(req: AnalyzeRequest) -> dict[str, Any]:
     text = build_full_text(req.title, req.body)
     if len(text.strip()) < 20:
-        raise HTTPException(status_code=400, detail="Please enter a longer headline or article snippet (at least ~20 characters).")
+        raise HTTPException(
+            status_code=400,
+            detail="Please enter a longer headline or article snippet (at least ~20 characters).",
+        )
 
-    p = predict_proba_fake(text, req.backend)
-    if p is None:
+    out = build_api_response(text, req.backend, req.teacher_mode)
+    if out is None:
         raise HTTPException(
             status_code=503,
             detail="Model files are missing. Run: python -m src.pipeline.run_train",
         )
+    out["source"] = {"type": "paste"}
+    return out
 
-    summary = user_friendly_summary(p)
-    response: dict[str, Any] = {
-        "score_toward_review_0_to_1": round(p, 4),
-        "user_summary": summary,
-        "interpretability": {
-            "plain_explanation": (
-                "We highlight words and phrases from your text that most moved the linear model toward "
-                "“review” or “reliable,” based on weights learned from training data. "
-                "This is not a list of lies—only statistical cues."
-            ),
-            "phrases_in_your_text": explain_classical_for_text(text, top_k=12)
-            if req.backend == "classical"
-            else [
-                {
-                    "phrase": "(Neural model)",
-                    "effect": "use_classical_backend_for_word_level_hints",
-                    "strength": 0.0,
-                }
-            ],
-        },
+
+@app.post("/api/analyze-url")
+def analyze_url(req: AnalyzeUrlRequest) -> dict[str, Any]:
+    """
+    Fetch a public HTML page and score extracted text. Respect site ToS and robots rules;
+    for production, prefer your CMS webhook or licensed feeds instead of hotlinking third parties.
+    """
+    try:
+        text, meta = fetch_url_text(str(req.url))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except httpx.HTTPError as e:
+        raise HTTPException(status_code=502, detail=f"Could not fetch URL: {e}") from e
+
+    if len(text.strip()) < 20:
+        raise HTTPException(status_code=400, detail="Extracted text too short.")
+
+    out = build_api_response(text, req.backend, req.teacher_mode)
+    if out is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Model files are missing. Run: python -m src.pipeline.run_train",
+        )
+    out["source"] = {
+        "type": "url",
+        **meta,
+        "compliance_note": "Use only where you have rights to retrieve and process this content.",
     }
-
-    if req.teacher_mode:
-        metrics = load_metrics_json()
-        if metrics and "classical" in metrics:
-            c = metrics["classical"]
-            response["teacher"] = {
-                "test_set": c.get("test"),
-                "validation_set": c.get("val"),
-                "train_set": c.get("train"),
-                "note": (
-                    "Precision = of all drafts flagged “review,” how many were truly in the review class in the dataset. "
-                    "Recall = of all truly questionable items in the dataset, how many we caught. "
-                    "Compare train vs val AUC in training_metrics to spot overfitting."
-                ),
-            }
-    return response
+    return out
 
 
 @app.get("/")

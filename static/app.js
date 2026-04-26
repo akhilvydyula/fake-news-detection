@@ -12,26 +12,62 @@ function badgeLabel(verdict) {
   return "Higher priority review";
 }
 
+function inputMode() {
+  const r = document.querySelector('input[name="inputmode"]:checked');
+  return r ? r.value : "paste";
+}
+
+function syncInputModeUi() {
+  const url = inputMode() === "url";
+  $("url-row").hidden = !url;
+  document.querySelectorAll(".paste-only").forEach((el) => {
+    el.style.display = url ? "none" : "";
+  });
+}
+
+document.querySelectorAll('input[name="inputmode"]').forEach((r) => {
+  r.addEventListener("change", syncInputModeUi);
+});
+syncInputModeUi();
+
 async function analyze() {
   $("error").hidden = true;
   $("result").hidden = true;
 
-  const payload = {
-    title: $("title").value.trim(),
-    body: $("body").value.trim(),
-    backend: $("backend").value,
-    teacher_mode: $("teacher").checked,
-  };
+  const backend = $("backend").value;
+  const teacher_mode = $("teacher").checked;
+  let res;
 
-  const res = await fetch("/api/analyze", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  if (inputMode() === "url") {
+    const url = $("url").value.trim();
+    if (!url) {
+      $("error").textContent = "Enter an https URL or switch to Paste text.";
+      $("error").hidden = false;
+      return;
+    }
+    res = await fetch("/api/analyze-url", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url, backend, teacher_mode }),
+    });
+  } else {
+    const payload = {
+      title: $("title").value.trim(),
+      body: $("body").value.trim(),
+      backend,
+      teacher_mode,
+    };
+    res = await fetch("/api/analyze", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    $("error").textContent = err.detail || `Request failed (${res.status})`;
+    const d = err.detail;
+    $("error").textContent = typeof d === "string" ? d : JSON.stringify(d || err) || `Request failed (${res.status})`;
     $("error").hidden = false;
     return;
   }
@@ -46,6 +82,8 @@ async function analyze() {
   $("detail").textContent = u.detail;
   $("scale-note").textContent = u.simple_scale;
 
+  $("executive-why").textContent = data.executive_why || "";
+
   const p = data.score_toward_review_0_to_1;
   $("meter-bar").style.setProperty("--w", `${Math.round(p * 100)}%`);
   $("meter-pct").textContent = `${Math.round(p * 100)}%`;
@@ -56,12 +94,26 @@ async function analyze() {
   (data.interpretability?.phrases_in_your_text || []).forEach((row) => {
     const li = document.createElement("li");
     const tag = row.effect === "pushes_toward_review" ? "Toward review" : "Toward reliable";
-    li.innerHTML = `<span>${escapeHtml(row.phrase)}</span><span class="tag">${tag}</span>`;
+    li.innerHTML = `<span>${escapeHtml(String(row.phrase))}</span><span class="tag">${tag}</span>`;
     phrases.appendChild(li);
   });
 
+  const fp = $("framing-panel");
+  const fl = $("framing-list");
+  if (data.product_framing) {
+    fp.hidden = false;
+    fl.innerHTML = "";
+    Object.values(data.product_framing).forEach((txt) => {
+      const li = document.createElement("li");
+      li.textContent = txt.replace(/\*\*/g, "");
+      fl.appendChild(li);
+    });
+  } else {
+    fp.hidden = true;
+  }
+
   const tp = $("teacher-panel");
-  if (payload.teacher_mode && data.teacher) {
+  if (teacher_mode && data.teacher) {
     tp.hidden = false;
     $("teacher-note").textContent = data.teacher.note || "";
     $("teacher-json").textContent = JSON.stringify(data.teacher, null, 2);

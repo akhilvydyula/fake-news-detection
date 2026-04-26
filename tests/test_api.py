@@ -39,6 +39,14 @@ def test_analyze_when_model_present():
     assert 0.0 <= data["score_toward_review_0_to_1"] <= 1.0
 
 
+def test_analyze_url_blocks_private_host():
+    r = client.post(
+        "/api/analyze-url",
+        json={"url": "http://127.0.0.1/nope", "backend": "classical"},
+    )
+    assert r.status_code == 400
+
+
 def test_metrics_json_optional():
     p = ARTIFACTS / "metrics.json"
     if not p.is_file():
