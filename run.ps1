@@ -8,7 +8,7 @@
 
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("serve", "setup", "train", "train-quick", "test", "doctor", "stop", "restart")]
+    [ValidateSet("serve", "worker", "setup", "train", "train-quick", "test", "doctor", "stop", "restart")]
     [string]$Command = "serve",
     [int]$Port = 0
 )
@@ -43,7 +43,8 @@ function Write-ServeBanner([int]$p) {
     Write-Host "  -------------------"
     Write-Host "  Dashboard:  $base/#dashboard"
     Write-Host "  Quick demo: $base/?demo=1#dashboard"
-    Write-Host "  API docs:   $base/docs"
+    Write-Host "  Queue API:  $base/api/v1/jobs/submit"
+    Write-Host "  (OpenAPI not served: configure clients from code or REST tools.)" -ForegroundColor DarkGray
     Write-Host "  Health:     $base/api/health"
     Write-Host ""
 }
@@ -97,7 +98,7 @@ switch ($Command) {
         Start-Sleep -Seconds 1
         Write-ServeBanner $p
         $env:NTP_PORT = "$p"
-        & $venvPython -m src.api
+        & $venvPython (Join-Path $Root "manage.py") runserver "127.0.0.1:$p"
         break
     }
     default {
@@ -116,7 +117,10 @@ switch ($Command) {
                 $p = Get-ListeningPort
                 Write-ServeBanner $p
                 $env:NTP_PORT = "$p"
-                & $venvPython -m src.api
+                & $venvPython (Join-Path $Root "manage.py") runserver "127.0.0.1:$p"
+            }
+            "worker" {
+                & $venvPython (Join-Path $Root "manage.py") process_jobs --poll-interval 2 --worker-name win-worker
             }
             "test" {
                 & $venvPython -m pytest -q

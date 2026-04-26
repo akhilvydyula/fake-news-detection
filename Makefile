@@ -72,7 +72,7 @@ lab-train: train-quick serve
 
 # --- App — dashboard + REST API (uses existing artifacts/) --------------------
 serve:
-	NTP_PORT=$(PORT) $(PYTHON) -m src.api
+	$(PYTHON) manage.py runserver 127.0.0.1:$(PORT)
 
 dev: serve
 ui: serve

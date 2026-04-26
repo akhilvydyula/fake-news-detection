@@ -1,7 +1,7 @@
 Metadata-Version: 2.4
 Name: fake-news-detection
 Version: 0.2.0
-Summary: Fake news draft scoring: data build, classical + Keras models, FastAPI UI, MLflow hooks.
+Summary: Fake news draft scoring: data build, classical + Keras models, Django platform UI, MLflow hooks.
 Author: Skills Marathon / maintainers
 License: MIT
 Requires-Python: >=3.11
@@ -13,14 +13,14 @@ Requires-Dist: datasets>=3.0.0
 Requires-Dist: huggingface_hub>=0.24.0
 Requires-Dist: tensorflow>=2.16.0
 Requires-Dist: regex>=2024.0.0
-Requires-Dist: fastapi>=0.115.0
-Requires-Dist: uvicorn[standard]>=0.32.0
+Requires-Dist: django>=5.0
 Requires-Dist: pydantic>=2.0.0
 Requires-Dist: httpx>=0.27.0
 Requires-Dist: beautifulsoup4>=4.12.0
 Requires-Dist: mlflow>=2.16.0
 Provides-Extra: dev
 Requires-Dist: pytest>=8.0.0; extra == "dev"
+Requires-Dist: pytest-django>=4.8.0; extra == "dev"
 Requires-Dist: invoke>=2.2.0; extra == "dev"
 
 # Fake news detection prototype
@@ -65,7 +65,7 @@ flowchart LR
     K2[keras_mini_transformer/model.keras]
   end
   subgraph score [Score new drafts]
-    API[FastAPI]
+    API[Django]
     UI[static/index.html]
     CLI[predict_cli.py]
   end
@@ -103,7 +103,7 @@ pip install -e ".[dev]"
 |------|---------------------|------------|
 | **PEP 621 / `pyproject.toml`** | Declaring dependencies in one standard file; `pip install -e .` | `pip install -e ".[dev]"` |
 | **Invoke (`tasks.py`)** | Cross-platform task runners; same role as scripts, less shell pain on Windows | `invoke --list` then e.g. `invoke train`, `invoke serve`, `invoke lab` |
-| **Make (`Makefile`)** | Classic build automation; common in C/C++ and many data teams; maps to CI “jobs” | `make train`, `make serve`, `make lab` (needs `make` on PATH) |
+| **Make (`Makefile`)** | Classic build automation; maps to CI “jobs” | `make setup && make serve` for UI (no train); `make lab-train` only if retraining (needs `make` on PATH) |
 | **Raw modules** | What actually runs under the hood | `python -m src.pipeline.run_train` |
 
 **Invoke cheat-sheet** (after `pip install -e ".[dev]"`):
@@ -122,8 +122,9 @@ invoke lab                 # train-quick then serve (blocks on server)
 **Make** (Git Bash / WSL / macOS / Linux):
 
 ```bash
-make install && make train && make serve
-# or: make lab
+make setup && make serve
+# UI only (venv already ready): make install && make serve
+# Optional retrain later: make train   or   make lab-train
 ```
 
 **Optional — `uv` (fast installer, advanced):** [Astral uv](https://github.com/astral-sh/uv) can create a venv and sync deps in one step: `uv venv && uv pip install -e ".[dev]"`. Teach it as “pip, but faster and reproducible.”
@@ -153,7 +154,7 @@ python -m src.pipeline.predict_cli --text-file .\my_article.txt --backend classi
 After training, start the server from the **project root**:
 
 ```powershell
-python -m uvicorn src.api.main:app --reload --host 127.0.0.1 --port 8000
+python manage.py runserver 127.0.0.1:8000
 ```
 
 - **UI:** open [http://127.0.0.1:8000/](http://127.0.0.1:8000/) — plain-language results, a simple “toward review” meter, and phrase-level hints (classical model).
@@ -300,6 +301,6 @@ Do **not** auto-delete or auto-publish purely from the model; use it as **decisi
 
 - Add **human review labels** from your CMS and fine-tune.
 - Add **language detection** and per-language heads.
-- Deploy the classical model behind a **FastAPI** service and cache vectorization for latency.
+- Deploy the classical model behind a **Django** (or similar) service and cache vectorization for latency.
 
 If you want, we can add a minimal API service and Docker packaging in a follow-up change.

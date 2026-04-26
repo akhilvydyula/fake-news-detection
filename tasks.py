@@ -91,9 +91,9 @@ def train_quick(c):
     }
 )
 def serve(c, host="127.0.0.1", port=8000):
-    """Run FastAPI + static UI with auto-reload."""
+    """Run Django (dashboard + JSON APIs) with the dev autoreload server."""
     c.run(
-        f'{_py()} -m uvicorn src.api.main:app --reload --host {host} --port {port}',
+        f'{_py()} manage.py runserver {host}:{port}',
         cwd=str(ROOT),
     )
 

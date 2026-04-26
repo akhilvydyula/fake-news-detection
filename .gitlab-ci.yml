@@ -40,7 +40,7 @@ test:
   timeout: 35m
   script:
     - pip install -e ".[dev]"
-    - python -c "from src.api.main import app; print(app.title)"
+    - python manage.py check
     - pytest -q
 
 # --- Security stage ---------------------------------------------------------

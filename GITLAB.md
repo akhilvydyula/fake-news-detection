@@ -22,7 +22,7 @@ On GitLab, only **`.gitlab-ci.yml`** (in the repo root) defines pipelines.
 
 | Stage | Job | Purpose |
 |--------|-----|---------|
-| `test` | `test` | `pip install -e ".[dev]"`, import FastAPI app, `pytest` |
+| `test` | `test` | `pip install -e ".[dev]"`, `python manage.py check`, `pytest` |
 | `security` | `dependency_audit` | `pip-audit` (+ JSON artifact). **`allow_failure: true`** so known ML transitive CVEs do not block teaching. |
 | `security` | `bandit_sast` | **Bandit** on `src/`; fails on medium+ issues (like GitHub). **`bandit-results.json`** in job artifacts. |
 
@@ -66,7 +66,7 @@ From the repo root, use the same image mentally as CI (`python:3.11-bookworm`), 
 ```bash
 python -m pip install -U pip
 pip install -e ".[dev]"
-python -c "from src.api.main import app; print(app.title)"
+python manage.py check
 pytest -q
 ```
 

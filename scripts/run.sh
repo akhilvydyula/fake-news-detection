@@ -5,7 +5,7 @@
 #   NTP_PORT=8765 ./scripts/run.sh serve
 #   ./scripts/run.sh stop               # free NTP_PORT (or 8000), needs lsof or fuser
 #   ./scripts/run.sh restart
-#   ./scripts/run.sh setup | train | train-quick | test | doctor
+#   ./scripts/run.sh setup | train | train-quick | test | doctor | worker
 
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -22,7 +22,8 @@ banner_serve() {
   echo "  -------------------"
   echo "  Dashboard:  http://127.0.0.1:${p}/#dashboard"
   echo "  Quick demo: http://127.0.0.1:${p}/?demo=1#dashboard"
-  echo "  API docs:   http://127.0.0.1:${p}/docs"
+  echo "  Queue API:  http://127.0.0.1:${p}/api/v1/jobs/submit"
+  echo "  (OpenAPI not served; use /api/health and JSON endpoints.)"
   echo ""
 }
 
@@ -65,20 +66,21 @@ case "$CMD" in
   serve)
     export NTP_PORT="$PORT"
     banner_serve "$PORT"
-    "$PY" -m src.api
+    "$PY" manage.py runserver "127.0.0.1:$PORT"
     ;;
+  worker)      "$PY" manage.py process_jobs --poll-interval 2 --worker-name unix-worker ;;
   stop) stop_port "$PORT" ;;
   restart)
     stop_port "$PORT"
     sleep 1
     export NTP_PORT="$PORT"
     banner_serve "$PORT"
-    "$PY" -m src.api
+    "$PY" manage.py runserver "127.0.0.1:$PORT"
     ;;
   test)        "$PY" -m pytest -q ;;
   doctor)      "$PY" -m src.pipeline.doctor ;;
   *)
-    echo "Usage: $0 setup|serve|stop|restart|train|train-quick|test|doctor"
+    echo "Usage: $0 setup|serve|worker|stop|restart|train|train-quick|test|doctor"
     exit 1
     ;;
 esac

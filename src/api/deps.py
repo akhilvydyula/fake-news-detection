@@ -7,10 +7,14 @@ import os
 from dataclasses import dataclass
 from typing import Literal
 
-from fastapi import HTTPException, Security
-from fastapi.security import APIKeyHeader
 
-_api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+class PlatformAPIError(Exception):
+    """Use instead of framework-specific HTTP errors so Django and tests can map to responses."""
+
+    def __init__(self, status_code: int, detail: str):
+        self.status_code = status_code
+        self.detail = detail
+        super().__init__(detail)
 
 
 @dataclass(frozen=True)
@@ -72,13 +76,13 @@ def resolve_platform_auth(api_key: str | None) -> PlatformAuth:
 
     if key_map:
         if not api_key or not api_key.strip():
-            raise HTTPException(
+            raise PlatformAPIError(
                 status_code=401,
                 detail="Invalid or missing X-API-Key. Use a key from PLATFORM_API_KEYS.",
             )
         org = key_map.get(api_key.strip())
         if org is None:
-            raise HTTPException(
+            raise PlatformAPIError(
                 status_code=401,
                 detail="Invalid X-API-Key.",
             )
@@ -86,15 +90,10 @@ def resolve_platform_auth(api_key: str | None) -> PlatformAuth:
 
     if single:
         if not api_key or api_key.strip() != single:
-            raise HTTPException(
+            raise PlatformAPIError(
                 status_code=401,
                 detail="Invalid or missing X-API-Key. Set header to match server PLATFORM_API_KEY.",
             )
         return PlatformAuth(org_id=default_org, authenticated=True)
 
     return PlatformAuth(org_id=None, authenticated=False)
-
-
-def require_platform_api_key(api_key: str | None = Security(_api_key_header)) -> PlatformAuth:
-    """Use on routes that share the same key rules as POST /api/v1/analyze."""
-    return resolve_platform_auth(api_key)

@@ -1,0 +1,2 @@
+[console_scripts]
+news-trust-platform = src.api.__main__:main

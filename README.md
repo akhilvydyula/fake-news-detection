@@ -2,6 +2,8 @@
 
 **Step-by-step runbook (setup, train, UI, shortcuts):** [DOCUMENTATION.md](DOCUMENTATION.md) · **Product / automation / teaching narrative:** [PRODUCT_AUTOMATION.md](PRODUCT_AUTOMATION.md)
 
+**Investor demo docs:** [DEMO_TODAY.md](DEMO_TODAY.md) · [INVESTOR_ONE_PAGER.md](INVESTOR_ONE_PAGER.md)
+
 **Quick start without typing `python -m …`:** from the repo root run `run.bat setup`, then `run.bat train`, then `run.bat serve` (Windows). On Unix use `./scripts/run.sh` with the same subcommands.
 
 End-to-end prototype for scoring **draft news text** before you publish it on your site: build a labeled dataset from **permissive public sources**, train **classical (TF–IDF + logistic regression)** and **TensorFlow/Keras** models (BiLSTM and a compact **multi-head attention** encoder), export **interpretable keyword hints**, and run a small CLI scorer.
@@ -40,7 +42,7 @@ flowchart LR
     K2[keras_mini_transformer/model.keras]
   end
   subgraph score [Score new drafts]
-    API[FastAPI]
+    API[Django]
     UI[static/index.html]
     CLI[predict_cli.py]
   end
@@ -129,7 +131,7 @@ python -m src.pipeline.predict_cli --text-file .\my_article.txt --backend classi
 After training, start the server from the **project root**:
 
 ```powershell
-python -m uvicorn src.api.main:app --reload --host 127.0.0.1 --port 8000
+python manage.py runserver 127.0.0.1:8000
 ```
 
 - **UI:** open [http://127.0.0.1:8000/](http://127.0.0.1:8000/) — plain-language results, a simple “toward review” meter, and phrase-level hints (classical model).
@@ -276,6 +278,6 @@ Do **not** auto-delete or auto-publish purely from the model; use it as **decisi
 
 - Add **human review labels** from your CMS and fine-tune.
 - Add **language detection** and per-language heads.
-- Deploy the classical model behind a **FastAPI** service and cache vectorization for latency.
+- Deploy the classical model behind a **Django** (or similar) service and cache vectorization for latency.
 
 If you want, we can add a minimal API service and Docker packaging in a follow-up change.

@@ -96,6 +96,7 @@
   var resultsPanel = document.getElementById("results-panel");
   var analyzeStatusEl = document.getElementById("analyze-status");
   var analysisResultsAnchor = document.getElementById("analysis-results");
+  var insightPanel = document.getElementById("insight-panel");
 
   function setAnalyzeStatus(text, kind) {
     if (!analyzeStatusEl) return;
@@ -124,7 +125,7 @@
       color +
       " " +
       pct +
-      "%, var(--border) 0);">" +
+      '%, var(--border) 0);">' +
       '<span class="donut-inner">' +
       pct +
       "%</span></div>" +
@@ -134,10 +135,125 @@
     );
   }
 
+  function renderInsightResults(data) {
+    setAnalyzeStatus("Insight complete — classical keyword breakdown below.", "ok");
+    if (resultsPlaceholder) resultsPlaceholder.hidden = true;
+    if (resultsContent) resultsContent.hidden = false;
+    if (insightPanel) {
+      insightPanel.hidden = false;
+    }
+    if (summaryBox) summaryBox.hidden = true;
+    if (ringsEl) ringsEl.innerHTML = "";
+    if (signalCardsEl) signalCardsEl.innerHTML = "";
+    if (framingEl) framingEl.innerHTML = "";
+
+    var fr = data.fake_risk || {};
+    var pct =
+      fr.percent_scale_toward_review != null
+        ? fr.percent_scale_toward_review
+        : Math.round((fr.score_toward_review_0_to_1 || 0) * 100);
+    var mq = (data.model && data.model.holdout_quality) || {};
+    var hold = mq.classical_tfidf_logistic || {};
+    var test = hold.holdout_test || {};
+    var qualHtml = "";
+    if (mq.available && test.accuracy != null) {
+      qualHtml =
+        '<p class="field-hint" style="margin:0 0 0.75rem;">Last training hold-out test accuracy (same classical model): <strong>' +
+        String(Math.round(test.accuracy * 10000) / 10000) +
+        "</strong>";
+      if (test.roc_auc != null) {
+        qualHtml += ' · ROC-AUC: <strong>' + escapeHtml(String(test.roc_auc).slice(0, 8)) + "</strong>";
+      }
+      if (test.f1 != null) {
+        qualHtml += ' · F1: <strong>' + escapeHtml(String(test.f1).slice(0, 8)) + "</strong>";
+      }
+      qualHtml += "</p>";
+    } else if (mq.note) {
+      qualHtml = '<p class="field-hint" style="margin:0 0 0.75rem;">' + escapeHtml(mq.note) + "</p>";
+    }
+
+    var kw = data.keywords || {};
+    var tr = kw.toward_editorial_review || [];
+    var tk = kw.toward_reliable_style || [];
+
+    function chips(items) {
+      if (!items || !items.length) {
+        return '<p class="field-hint">None surfaced.</p>';
+      }
+      return (
+        '<ul class="keyword-chip-list">' +
+        items
+          .map(function (x) {
+            var st = x.strength != null ? " · " + String(x.strength) : "";
+            return "<li>" + escapeHtml(x.phrase || "") + (st ? '<span style="color:var(--muted);font-size:0.72rem;">' + escapeHtml(st) + "</span>" : "") + "</li>";
+          })
+          .join("") +
+        "</ul>"
+      );
+    }
+
+    var why = data.why || {};
+    var soc = data.societal_concern || {};
+    var aspects = soc.risk_aspects || [];
+
+    if (insightPanel) {
+      insightPanel.innerHTML =
+        "<h3>Classical model insight</h3>" +
+        qualHtml +
+        '<div class="insight-score">' +
+        pct +
+        "%</div>" +
+        '<p style="margin:0 0 0.35rem;color:var(--muted);font-size:0.85rem;">toward “needs review” vs. this model’s training labels (not a truth score)</p>' +
+        '<p class="insight-lead"><strong>' +
+        escapeHtml(fr.headline || "") +
+        "</strong> " +
+        escapeHtml(fr.detail || "") +
+        "</p>" +
+        "<h3>Why this score</h3>" +
+        '<p class="insight-lead">' +
+        escapeHtml(why.executive_summary || "") +
+        "</p>" +
+        '<p class="insight-lead">' +
+        escapeHtml(why.longer_story || "") +
+        "</p>" +
+        "<h3>Triage concern (coarse)</h3>" +
+        '<p class="insight-lead"><strong>' +
+        escapeHtml(soc.level || "") +
+        '</strong> — ' +
+        escapeHtml(soc.rationale || "") +
+        "</p>" +
+        aspects
+          .map(function (a) {
+            return '<p class="field-hint" style="margin:0.35rem 0;">' + escapeHtml(a) + "</p>";
+          })
+          .join("") +
+        '<h3 style="margin-top:1rem;">Keywords (statistical)</h3><p class="field-hint" style="margin:0 0 0.5rem;">' +
+        escapeHtml(kw.method || "") +
+        '</p><div class="insight-keywords two-col"><div><strong>Toward review</strong>' +
+        chips(tr) +
+        '</div><div><strong>Toward reliable-style</strong>' +
+        chips(tk) +
+        "</div></div>";
+    }
+
+    var scrollTarget = analysisResultsAnchor || resultsPanel;
+    if (scrollTarget && scrollTarget.scrollIntoView) {
+      try {
+        scrollTarget.scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch (_) {
+        scrollTarget.scrollIntoView(true);
+      }
+    }
+  }
+
   function renderResults(data) {
     setAnalyzeStatus("Analysis complete — scores and signals are below.", "ok");
     if (resultsPlaceholder) resultsPlaceholder.hidden = true;
     if (resultsContent) resultsContent.hidden = false;
+    if (insightPanel) {
+      insightPanel.innerHTML = "";
+      insightPanel.hidden = true;
+    }
 
     var plat = data.platform || {};
     var dims = plat.dimensions || {};
@@ -251,8 +367,10 @@
     var backend = (backendEl && backendEl.value) || "classical";
     var apiKeyEl = document.getElementById("apiKey");
     var apiKey = (apiKeyEl && apiKeyEl.value && apiKeyEl.value.trim()) || "";
+    var insightChk = document.getElementById("chk-keyword-insight");
+    var useInsight = !!(insightChk && insightChk.checked);
 
-    var payload = { backend: backend, teacher_mode: false };
+    var payload = {};
     if (mode === "url") {
       var urlEl = document.getElementById("url");
       var url = (urlEl && urlEl.value && urlEl.value.trim()) || "";
@@ -280,6 +398,10 @@
         setAnalyzeStatus("", null);
         return;
       }
+    }
+    if (!useInsight) {
+      payload.backend = backend;
+      payload.teacher_mode = false;
     }
 
     var headers = { "Content-Type": "application/json" };
@@ -350,7 +472,11 @@
           return;
         }
         try {
-          renderResults(res.data);
+          if (res.data && res.data.fake_risk && res.data.keywords) {
+            renderInsightResults(res.data);
+          } else {
+            renderResults(res.data);
+          }
         } catch (e2) {
           setAnalyzeStatus("Could not render results.", "err");
           if (errEl) {
@@ -491,10 +617,130 @@
     }
   }
 
+  function renderQueueJobs(jobs) {
+    var queueList = document.getElementById("queue-list");
+    if (!queueList) return;
+    if (!jobs || !jobs.length) {
+      queueList.innerHTML = '<p class="field-hint">No queued jobs yet for this org.</p>';
+      return;
+    }
+    queueList.innerHTML = jobs
+      .map(function (job) {
+        var rid = String(job.job_id || "").slice(0, 8);
+        var summary = ((job.result || {}).summary || "").trim();
+        var topSignals = (job.result && job.result.top_signals) || [];
+        return (
+          '<article class="queue-item">' +
+          '<div class="queue-item-top">' +
+          '<span class="queue-id">Job ' +
+          escapeHtml(rid) +
+          '</span>' +
+          '<span class="queue-status ' +
+          escapeHtml(job.status || "pending") +
+          '">' +
+          escapeHtml(job.status || "pending") +
+          "</span>" +
+          "</div>" +
+          (summary
+            ? '<p class="queue-summary">' + escapeHtml(summary) + "</p>"
+            : "") +
+          (topSignals.length
+            ? '<p class="field-hint">Top signals: ' + escapeHtml(topSignals.join(", ")) + "</p>"
+            : "") +
+          (job.error ? '<p class="err" style="margin-top:0.4rem;">' + escapeHtml(job.error) + "</p>" : "") +
+          "</article>"
+        );
+      })
+      .join("");
+  }
+
+  function queueError(message) {
+    var queueErr = document.getElementById("queue-err");
+    if (!queueErr) return;
+    if (!message) {
+      queueErr.hidden = true;
+      queueErr.textContent = "";
+      return;
+    }
+    queueErr.hidden = false;
+    queueErr.textContent = message;
+  }
+
+  async function refreshQueue() {
+    var orgInput = document.getElementById("queue-org-id");
+    var orgId = (orgInput && orgInput.value && orgInput.value.trim()) || "demo-org";
+    try {
+      var r = await fetch(apiUrl("/api/v1/jobs?org_id=" + encodeURIComponent(orgId)));
+      var body = await r.json();
+      if (!r.ok) {
+        queueError(formatErrorDetail(body && body.detail, r.status));
+        return;
+      }
+      queueError("");
+      renderQueueJobs(body.jobs || []);
+    } catch (e) {
+      queueError("Could not load queue jobs: " + String((e && e.message) || e));
+    }
+  }
+
+  async function submitQueueJob() {
+    var queueBtn = document.getElementById("queue-submit-btn");
+    var lastJob = document.getElementById("queue-last-job");
+    var payload = {
+      org_id: ((document.getElementById("queue-org-id") || {}).value || "demo-org").trim() || "demo-org",
+      title: ((document.getElementById("queue-title") || {}).value || "").trim(),
+      body: ((document.getElementById("queue-body") || {}).value || "").trim(),
+      url: ((document.getElementById("queue-url") || {}).value || "").trim() || null,
+      backend: ((document.getElementById("queue-backend") || {}).value || "classical").trim(),
+      teacher_mode: false,
+    };
+    if (!payload.url && ((payload.title + " " + payload.body).trim().length < 20)) {
+      queueError("Enter at least ~20 characters (title + body), or provide a URL.");
+      return;
+    }
+    queueError("");
+    if (queueBtn) queueBtn.disabled = true;
+    try {
+      var res = await fetch(apiUrl("/api/v1/jobs/submit"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      var data = await res.json();
+      if (!res.ok) {
+        queueError(formatErrorDetail(data && data.detail, res.status));
+        return;
+      }
+      if (lastJob) {
+        lastJob.textContent = "Latest job id: " + data.job_id + " (" + data.status + ")";
+      }
+      await refreshQueue();
+    } catch (e2) {
+      queueError("Could not submit job: " + String((e2 && e2.message) || e2));
+    } finally {
+      if (queueBtn) queueBtn.disabled = false;
+    }
+  }
+
   function init() {
     loadHealth();
     fillCurlExamples();
     maybeDemoRunFromQuery();
+    var queueForm = document.getElementById("queue-form");
+    var queueRefresh = document.getElementById("queue-refresh-btn");
+    if (queueForm) {
+      queueForm.addEventListener("submit", function (e) {
+        e.preventDefault();
+        submitQueueJob();
+      });
+    }
+    if (queueRefresh) {
+      queueRefresh.addEventListener("click", function () {
+        refreshQueue();
+      });
+    }
+    refreshQueue();
+    setInterval(refreshQueue, 4000);
   }
 
   if (document.readyState === "loading") {

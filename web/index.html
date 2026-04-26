@@ -7,11 +7,11 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/platform.css?v=5" />
+  <link rel="stylesheet" href="assets/platform.css?v=9" />
 </head>
 <body>
   <div id="asset-load-err" class="asset-fail-banner" hidden>
-    Could not load <code>assets/platform.js</code> — analysis will not work. Serve this page from the FastAPI app (not a raw file) and confirm the server is running.
+    Could not load <code>assets/platform.js</code> — analysis will not work. Serve this page from the Django app (not a raw file) and confirm the server is running.
   </div>
   <div id="ntp-offline" class="asset-fail-banner" hidden></div>
   <nav class="nav">
@@ -250,6 +250,16 @@
               <label for="apiKey">API key (optional)</label>
               <input id="apiKey" name="apiKey" type="password" autocomplete="off" placeholder="If server requires X-API-Key" />
             </div>
+            <div class="field field-checkbox">
+              <label class="checkbox-label"
+                ><input type="checkbox" id="chk-keyword-insight" name="keywordInsight" />
+                Full keyword &amp; “why” breakdown (fast classical path)</label
+              >
+              <p class="field-hint">
+                One request to <code>POST /api/v1/insight</code> — fake-style risk %, training hold-out scores (if you trained),
+                TF–IDF keyword drivers, summaries, and a coarse concern level. Ignores Keras backend below.
+              </p>
+            </div>
             <button type="submit" class="btn-primary" id="btn-analyze">Run analysis</button>
             <div class="err" id="analyze-err" hidden></div>
           </form>
@@ -259,6 +269,7 @@
           <p id="analyze-status" class="analyze-status" aria-live="polite" hidden></p>
           <p id="results-placeholder" style="color:var(--muted);margin:0;">Submit an analysis to see scores and signal breakdown.</p>
           <div id="results-content" hidden>
+            <div id="insight-panel" class="insight-panel" hidden></div>
             <div class="summary-box" id="summary-box" hidden>
               <h3>Summary</h3>
               <p id="summary-text"></p>
@@ -269,6 +280,45 @@
             <div class="disclaimer" id="product-framing"></div>
           </div>
         </div>
+      </div>
+      <div class="queue-demo">
+        <h2>Batch / Queue demo</h2>
+        <p class="queue-copy">Submit jobs for async processing, then watch status transitions from <code>pending</code> to <code>succeeded</code> (or <code>failed</code>).</p>
+        <form id="queue-form" action="#" onsubmit="return false;">
+          <div class="queue-grid">
+            <div class="field">
+              <label for="queue-org-id">Org ID (tenant)</label>
+              <input id="queue-org-id" type="text" value="demo-org" />
+            </div>
+            <div class="field">
+              <label for="queue-url">Article URL (optional)</label>
+              <input id="queue-url" type="url" placeholder="https://example.com/article" />
+            </div>
+            <div class="field">
+              <label for="queue-title">Title</label>
+              <input id="queue-title" type="text" placeholder="Queue demo headline" />
+            </div>
+            <div class="field">
+              <label for="queue-backend">Backend</label>
+              <select id="queue-backend">
+                <option value="classical">Classical (TF–IDF + LR)</option>
+                <option value="bilstm">Keras BiLSTM (if trained)</option>
+                <option value="mini_transformer">Keras mini transformer (if trained)</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="queue-body">Body</label>
+            <textarea id="queue-body" rows="4" placeholder="Paste article text for async queue processing"></textarea>
+          </div>
+          <div class="queue-actions">
+            <button id="queue-submit-btn" type="submit" class="btn-primary queue-btn">Submit queue job</button>
+            <button id="queue-refresh-btn" type="button" class="btn-hero btn-hero-secondary">Refresh queue status</button>
+          </div>
+          <div class="err" id="queue-err" hidden></div>
+          <p class="field-hint" id="queue-last-job"></p>
+        </form>
+        <div id="queue-list" class="queue-list"></div>
       </div>
     </section>
 
@@ -392,7 +442,7 @@
 })();
   </script>
   <script
-    src="assets/platform.js?v=7"
+    src="assets/platform.js?v=9"
     defer
     onerror="document.getElementById('asset-load-err').hidden=false"
   ></script>

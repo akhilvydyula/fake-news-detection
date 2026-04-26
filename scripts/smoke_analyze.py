@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Verify POST /api/v1/analyze with the same JSON shape as the dashboard.
 
-Usage (no server — uses FastAPI TestClient):
+Usage (no server — uses Django test client, no port):
   python scripts/smoke_analyze.py
 
 Usage (live server — same as browser fetch):
@@ -36,13 +36,21 @@ SAMPLE = {
 
 
 def run_testclient() -> int:
-    from fastapi.testclient import TestClient
+    import os
 
-    from src.api.main import app
+    import django
 
-    client = TestClient(app)
-    r = client.post("/api/v1/analyze", json=SAMPLE)
-    return _check_response(r.status_code, r.text)
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "newstrust.settings")
+    django.setup()
+    from django.test import Client
+
+    client = Client()
+    r = client.post(
+        "/api/v1/analyze",
+        data=json.dumps(SAMPLE),
+        content_type="application/json",
+    )
+    return _check_response(r.status_code, r.content.decode("utf-8", errors="replace"))
 
 
 def run_http(base_url: str, api_key: str | None) -> int:

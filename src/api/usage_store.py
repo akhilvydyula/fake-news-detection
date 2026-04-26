@@ -69,19 +69,22 @@ def usage_summary(org_id: str, days: int = 30) -> dict:
         conn = _connect()
         try:
             cur = conn.execute(
-                "SELECT COUNT(*) FROM api_usage WHERE org_id = ? AND ts >= ? AND path = ?",
-                (org_id, cutoff, "/api/v1/analyze"),
+                """
+                SELECT COUNT(*) FROM api_usage
+                WHERE org_id = ? AND ts >= ? AND path IN (?, ?)
+                """,
+                (org_id, cutoff, "/api/v1/analyze", "/api/v1/insight"),
             )
             total = int(cur.fetchone()[0])
             cur = conn.execute(
                 """
                 SELECT substr(ts, 1, 10) AS day, COUNT(*) AS n
                 FROM api_usage
-                WHERE org_id = ? AND ts >= ? AND path = ?
+                WHERE org_id = ? AND ts >= ? AND path IN (?, ?)
                 GROUP BY substr(ts, 1, 10)
                 ORDER BY day
                 """,
-                (org_id, cutoff, "/api/v1/analyze"),
+                (org_id, cutoff, "/api/v1/analyze", "/api/v1/insight"),
             )
             by_day = [{"day": row[0], "analyze_requests": row[1]} for row in cur.fetchall()]
         finally:
