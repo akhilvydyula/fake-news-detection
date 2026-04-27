@@ -41,3 +41,47 @@ class AnalysisJob(models.Model):
 class WorkerHeartbeat(models.Model):
     worker_name = models.CharField(max_length=120, unique=True)
     last_seen_at = models.DateTimeField(auto_now=True)
+
+
+class Case(models.Model):
+    class State(models.TextChoices):
+        NEW = "NEW", "New"
+        UNDER_REVIEW = "UNDER_REVIEW", "Under review"
+        VERIFIED = "VERIFIED", "Verified"
+        ESCALATED = "ESCALATED", "Escalated"
+        CLOSED = "CLOSED", "Closed"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    org_id = models.CharField(max_length=120, default="demo-org")
+    title = models.CharField(max_length=500, blank=True, default="")
+    article_text = models.TextField(blank=True, default="")
+    state = models.CharField(max_length=20, choices=State.choices, default=State.NEW)
+    assignee = models.CharField(max_length=120, blank=True, default="")
+    severity = models.FloatField(default=0.0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+        indexes = [
+            models.Index(fields=["org_id", "updated_at"]),
+            models.Index(fields=["org_id", "state"]),
+        ]
+
+
+class CaseEvent(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    case = models.ForeignKey(Case, related_name="events", on_delete=models.CASCADE)
+    org_id = models.CharField(max_length=120, default="demo-org")
+    event_type = models.CharField(max_length=40)
+    old_value = models.CharField(max_length=200, blank=True, default="")
+    new_value = models.CharField(max_length=200, blank=True, default="")
+    actor = models.CharField(max_length=120, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        indexes = [
+            models.Index(fields=["case", "created_at"]),
+            models.Index(fields=["org_id", "created_at"]),
+        ]

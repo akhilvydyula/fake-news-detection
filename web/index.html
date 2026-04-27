@@ -6,443 +6,242 @@
   <title>News Trust Platform</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="assets/platform.css?v=9" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/platform.css?v=11" />
 </head>
 <body>
   <div id="asset-load-err" class="asset-fail-banner" hidden>
-    Could not load <code>assets/platform.js</code> — analysis will not work. Serve this page from the Django app (not a raw file) and confirm the server is running.
+    Could not load <code>assets/platform.js</code>. Serve this page from the Django app and confirm the server is running.
   </div>
-  <div id="ntp-offline" class="asset-fail-banner" hidden></div>
-  <nav class="nav">
-    <div class="nav-inner">
-      <a href="#home" class="logo" id="brand-logo" data-page="home">News<span>Trust</span></a>
-      <div class="nav-links">
-        <a href="#home" data-page="home">Home</a>
-        <a href="#dashboard" data-page="dashboard">Dashboard</a>
-        <a href="#pricing" data-page="pricing">Pricing</a>
-        <a href="#docs" data-page="docs">Docs &amp; API</a>
-        <a href="#security" data-page="security">Security</a>
-        <a href="#dashboard" class="nav-cta" data-page="dashboard" title="Opens the triage desk on this page (no separate URL)">Analyze</a>
-      </div>
-    </div>
-  </nav>
+  <div id="sticky-status" class="sticky-status is-hidden" aria-live="polite"></div>
 
-  <div class="shell">
-    <section id="home" class="page page-home" data-page="home">
-      <header class="hero-mega">
-        <p class="hero-brand-chip"><span id="hero-brand-line">News Trust Platform</span></p>
-        <h1 id="hero-title" class="mega-headline">
-          Triage work, <span class="mega-accent">simplified.</span>
-        </h1>
-        <p class="mega-tagline">More clarity for the stories that actually need your judgment.</p>
-        <p class="hero-lead hero-lead-centered" id="hero-sub">
-          Paste text or fetch from allowed URLs. Readable scores for misinformation-style risk, heuristic AI-pattern cues, and a blended triage readout — plus signal cards and a short summary you control in code. ML assists editors; it does not replace them.
-        </p>
-        <div class="hero-actions hero-actions-centered">
-          <a href="#dashboard" class="btn-hero btn-hero-primary btn-hero-lg" data-page="dashboard">Try the live desk</a>
-          <a href="#docs" class="btn-hero btn-hero-secondary btn-hero-lg" data-page="docs">Read the API</a>
+  <main class="app-shell-shell">
+    <aside class="sidebar">
+      <div class="brand-block">
+        <a href="#" class="brand" id="brand-logo">News Trust <span>Platform</span></a>
+        <p class="brand-tag" id="hero-brand-line">Detection management workspace</p>
+      </div>
+      <div class="nav-section">Workspace</div>
+      <section class="workspace-tabs" aria-label="Main workspace sections">
+        <button class="tab-btn is-active" type="button" data-workspace-tab="analyze">Analyze</button>
+        <button class="tab-btn" type="button" data-workspace-tab="queue">Queue jobs</button>
+        <button class="tab-btn" type="button" data-workspace-tab="cases">Cases</button>
+        <button class="tab-btn" type="button" data-workspace-tab="summary">Summary</button>
+      </section>
+      <div class="nav-section">External</div>
+      <nav class="top-actions">
+        <a href="/openapi.json" target="_blank" rel="noopener">API schema</a>
+        <a href="?demo=1" id="quick-demo-link">Run demo</a>
+      </nav>
+    </aside>
+
+    <div class="main">
+      <header class="topbar">
+        <div>
+          <h1>Risk dashboard</h1>
+          <p>Analyze articles, queue processing, and triage editorial cases.</p>
         </div>
-        <p class="trust-strip trust-strip-centered">Self-hosted · <code>POST /api/v1/analyze</code> · optional <code>X-API-Key</code></p>
+        <div class="topbar-badges">
+          <span class="badge badge-red" id="badge-high-risk">0 high risk</span>
+          <span class="badge badge-amber" id="badge-pending-review">0 pending review</span>
+          <span class="badge badge-green">System live</span>
+        </div>
       </header>
 
-      <div class="landing-block">
-        <h2 class="mega-section-title">From noisy feeds to confident output</h2>
-        <p class="mega-section-lead">A single triage layer for desks and product teams — classical or deep models behind one HTTP contract, with enrichment you can tune per tenant.</p>
-      </div>
-
-      <div class="dual-insight">
-        <div class="insight-col">
-          <h3 class="insight-col-title">What slows teams down</h3>
-          <div class="insight-item">
-            <h4>Tool sprawl</h4>
-            <p>Scores in one tab, summaries in another, and no shared language for “send to review.”</p>
-          </div>
-          <div class="insight-item">
-            <h4>Fragile one-off checks</h4>
-            <p>Prompt-only or single-signal tools miss nuance when the news cycle accelerates.</p>
-          </div>
-          <div class="insight-item">
-            <h4>Hard to operationalize</h4>
-            <p>Without an API and clear auth, experiments never graduate to CMS hooks or alerts.</p>
-          </div>
-        </div>
-        <div class="insight-col insight-col-highlight">
-          <h3 class="insight-col-title">Our approach</h3>
-          <div class="insight-item">
-            <h4>One consistent panel</h4>
-            <p>Rings, summary, and operator-written signal cards so everyone sees the same story.</p>
-          </div>
-          <div class="insight-item">
-            <h4>Multi-signal, explainable</h4>
-            <p>Blend classical and experimental cues; keep humans on the final call.</p>
-          </div>
-          <div class="insight-item">
-            <h4>Built to integrate</h4>
-            <p>OpenAPI, optional API keys, usage endpoints — designed for real pipelines, not demos only.</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="landing-block">
-        <h2 class="mega-section-title">Core workflow</h2>
-        <p class="mega-section-lead">Four steps from raw text to a decision your desk can act on.</p>
-        <ol class="workflow-steps">
-          <li class="workflow-step">
-            <span class="workflow-num" aria-hidden="true">1</span>
-            <h3>Capture</h3>
-            <p>Paste a headline and body, or fetch text from an allowed article URL.</p>
-          </li>
-          <li class="workflow-step">
-            <span class="workflow-num" aria-hidden="true">2</span>
-            <h3>Score</h3>
-            <p>Run the backend you trust — TF–IDF + LR, BiLSTM, or mini transformer when trained.</p>
-          </li>
-          <li class="workflow-step">
-            <span class="workflow-num" aria-hidden="true">3</span>
-            <h3>Review</h3>
-            <p>Scan rings, read the extractive summary, and open signal cards tuned to your voice.</p>
-          </li>
-          <li class="workflow-step">
-            <span class="workflow-num" aria-hidden="true">4</span>
-            <h3>Ship</h3>
-            <p>Publish, escalate, or call the same analyze endpoint from your CMS or alerting stack.</p>
-          </li>
-        </ol>
-      </div>
-
-      <div class="landing-block">
-        <h2 class="mega-section-title">Why teams pick this shape</h2>
-        <div class="diff-grid">
-          <article class="diff-card">
-            <h3>Desk-native copy</h3>
-            <p>Signal cards and framing strings live in your repo — not a vendor’s generic tooltip.</p>
-          </article>
-          <article class="diff-card">
-            <h3>Model choice</h3>
-            <p>Swap classical baselines for neural checkpoints without changing client integrations.</p>
-          </article>
-          <article class="diff-card">
-            <h3>Deep integration</h3>
-            <p>JSON in and out; embed beside CMS, Slack, or internal review tools.</p>
-          </article>
-          <article class="diff-card">
-            <h3>Humans stay central</h3>
-            <p>Scores rank the queue; editors own the byline and the final publish decision.</p>
-          </article>
-          <article class="diff-card">
-            <h3>Room to evolve</h3>
-            <p>Add enrichment, new backends, or metering as you grow from pilot to production.</p>
-          </article>
-        </div>
-      </div>
-
-      <div class="io-flow">
-        <div class="io-flow-header">
-          <h2 class="mega-section-title mega-section-title-tight">What goes in — what comes out</h2>
-          <p class="mega-section-lead mega-section-lead-tight">One mental model for producers and engineers alike.</p>
-        </div>
-        <div class="io-columns">
-          <div class="io-col">
-            <p class="io-label">Inputs</p>
-            <ul class="io-list">
-              <li><strong>Paste</strong> — title optional, body required for best results</li>
-              <li><strong>URL</strong> — server fetch with safety limits and allowlists</li>
-              <li><strong>API</strong> — same payload as the dashboard via <code>POST /api/v1/analyze</code></li>
-            </ul>
-          </div>
-          <div class="io-arrow" aria-hidden="true">→</div>
-          <div class="io-col io-col-out">
-            <p class="io-label">Outputs</p>
-            <ul class="io-list">
-              <li><strong>Scores</strong> — misinformation-style risk, AI-pattern heuristic, blended triage</li>
-              <li><strong>Summary</strong> — short extractive recap for speed-reading</li>
-              <li><strong>Platform JSON</strong> — <code>signal_cards</code>, usage hints, health-friendly fields</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      <div class="landing-block">
-        <h2 class="mega-section-title">Features</h2>
-        <p class="mega-section-lead">Everything in one deployment for a smoother editorial experience.</p>
-        <div class="feature-matrix">
-          <article class="feature-cell">
-            <h3>Live dashboard</h3>
-            <p>Paste or URL, pick a backend, and see results immediately — no CLI required.</p>
-          </article>
-          <article class="feature-cell">
-            <h3>OpenAPI first</h3>
-            <p>Import <code>/openapi.json</code> into Postman or codegen; stable analyze contract.</p>
-          </article>
-          <article class="feature-cell">
-            <h3>Optional API keys</h3>
-            <p>Single tenant or multi-org keys with usage counters on the server.</p>
-          </article>
-          <article class="feature-cell">
-            <h3>Safe URL ingestion</h3>
-            <p>Size caps and host policies reduce abuse; paste is always a fallback.</p>
-          </article>
-          <article class="feature-cell">
-            <h3>Security section</h3>
-            <p>Auth patterns, fetch safety, and data-handling notes for reviewers.</p>
-          </article>
-          <article class="feature-cell">
-            <h3>Pricing paths</h3>
-            <p>From self-hosted starter to enterprise VPC — grow without re-platforming.</p>
-          </article>
-        </div>
-      </div>
-
-      <div class="connect-band">
-        <h2 class="connect-title">Connect</h2>
-        <p class="connect-lead">Try a quick win on your own copy before you wire a large integration.</p>
-        <div class="connect-actions">
-          <a href="#dashboard" class="btn-hero btn-hero-primary btn-hero-lg" data-page="dashboard">Open triage desk</a>
-          <a href="#pricing" class="btn-hero btn-hero-secondary btn-hero-lg" data-page="pricing">View pricing</a>
-        </div>
-      </div>
-    </section>
-
-    <section id="dashboard" class="page" data-page="dashboard">
-      <header class="dash-page-header">
-        <p class="eyebrow">Live analyzer</p>
-        <h1>Editorial triage desk</h1>
-        <p class="dash-lead">Run an analysis. Results appear in the <strong>Results</strong> column on the right (same page). Use <strong>Load sample &amp; run</strong> for a one-click demo. Or open <a href="?demo=1#dashboard">?demo=1#dashboard</a> after starting the server.</p>
-      </header>
-      <div class="dash-grid">
-        <div class="panel">
-          <h2>Input</h2>
-          <!-- Never use method="post" here: native submit POSTs to / → FastAPI returns 405 (only GET / exists). -->
-          <!-- No native submit: default GET would reload / and drop #dashboard, skipping fetch. -->
+      <section class="workspace-panel is-active" data-tab-panel="analyze">
+      <div class="workspace-grid">
+        <aside class="card form-card">
+          <h2>Article input</h2>
+          <p class="helper">Start with a quick sample or enter your own article details.</p>
           <form id="analyze-form" action="#" onsubmit="return false;">
-            <div class="tabs-inline">
-              <label><input type="radio" name="mode" value="paste" checked /> Paste</label>
-              <label><input type="radio" name="mode" value="url" /> From URL</label>
-              <button type="button" class="btn-sample" id="btn-load-sample" title="Fills sample text and runs analysis automatically">Load sample &amp; run</button>
+            <div class="mode-toggle">
+              <label><input type="radio" name="mode" value="paste" checked /> Paste text</label>
+              <label><input type="radio" name="mode" value="url" /> Fetch from URL</label>
             </div>
+
+            <div class="quick-row">
+              <button type="button" class="btn btn-soft" id="btn-load-sample">Quick start: sample and run</button>
+              <button type="button" class="btn btn-soft" id="btn-load-sample-only">Load sample only</button>
+            </div>
+
             <div id="paste-fields">
               <div class="field">
                 <label for="title">Title (optional)</label>
-                <input id="title" name="title" type="text" placeholder="Headline" autocomplete="off" />
+                <input id="title" name="title" type="text" placeholder="Example: City council approves transit plan" autocomplete="off" />
               </div>
               <div class="field">
-                <label for="body">Body</label>
-                <textarea id="article-body" name="body" placeholder="Article text (longer is better)" rows="6"></textarea>
-                <p class="field-hint">Press <kbd>Enter</kbd> in the title to run, or <kbd>Ctrl</kbd>+<kbd>Enter</kbd> here (Windows/Linux) / <kbd>⌘</kbd>+<kbd>Enter</kbd> on Mac.</p>
+                <label for="article-body">Article body</label>
+                <textarea id="article-body" name="body" rows="7" placeholder="Paste article text for analysis"></textarea>
+                <p class="field-hint">Tip: Press <kbd>Ctrl</kbd>+<kbd>Enter</kbd> (or <kbd>Cmd</kbd>+<kbd>Enter</kbd>) to run quickly.</p>
               </div>
             </div>
-            <div id="url-fields" style="display:none;">
+
+            <div id="url-fields" hidden>
               <div class="field">
                 <label for="url">Article URL</label>
-                <input id="url" name="url" type="url" placeholder="https://example.com/article" autocomplete="off" />
+                <input id="url" name="url" type="url" placeholder="https://example.com/news-story" autocomplete="off" />
               </div>
             </div>
+
             <div class="field">
-              <label for="backend">ML backend</label>
+              <label for="backend">Model backend</label>
               <select id="backend" name="backend">
-                <option value="classical">Classical (TF–IDF + LR)</option>
+                <option value="classical">Classical (TF-IDF + Logistic Regression)</option>
                 <option value="bilstm">Keras BiLSTM (if trained)</option>
                 <option value="mini_transformer">Keras mini transformer (if trained)</option>
               </select>
             </div>
             <div class="field">
               <label for="apiKey">API key (optional)</label>
-              <input id="apiKey" name="apiKey" type="password" autocomplete="off" placeholder="If server requires X-API-Key" />
+              <input id="apiKey" name="apiKey" type="password" autocomplete="off" placeholder="Only needed when server requires X-API-Key" />
             </div>
             <div class="field field-checkbox">
-              <label class="checkbox-label"
-                ><input type="checkbox" id="chk-keyword-insight" name="keywordInsight" />
-                Full keyword &amp; “why” breakdown (fast classical path)</label
-              >
-              <p class="field-hint">
-                One request to <code>POST /api/v1/insight</code> — fake-style risk %, training hold-out scores (if you trained),
-                TF–IDF keyword drivers, summaries, and a coarse concern level. Ignores Keras backend below.
-              </p>
+              <label class="checkbox-label">
+                <input type="checkbox" id="chk-keyword-insight" name="keywordInsight" />
+                Include full classical keyword insight
+              </label>
+              <p class="field-hint">Uses the existing insight API path and returns additional explainability details.</p>
             </div>
-            <button type="submit" class="btn-primary" id="btn-analyze">Run analysis</button>
+            <button type="submit" class="btn btn-primary" id="btn-analyze">Run analysis</button>
             <div class="err" id="analyze-err" hidden></div>
           </form>
-        </div>
-        <div class="panel" id="results-panel">
-          <h2 id="analysis-results">Results</h2>
-          <p id="analyze-status" class="analyze-status" aria-live="polite" hidden></p>
-          <p id="results-placeholder" style="color:var(--muted);margin:0;">Submit an analysis to see scores and signal breakdown.</p>
+        </aside>
+
+        <section class="card results-card" id="results-panel">
+          <div class="results-head">
+            <h2 id="analysis-results">Analysis results</h2>
+            <p id="analyze-status" class="analyze-status" aria-live="polite" hidden></p>
+          </div>
+          <div id="results-placeholder" class="empty-state">
+            <p>No analysis yet.</p>
+            <small>Run analysis from the left panel to see scores, summary, and signals.</small>
+          </div>
           <div id="results-content" hidden>
             <div id="insight-panel" class="insight-panel" hidden></div>
             <div class="summary-box" id="summary-box" hidden>
-              <h3>Summary</h3>
+              <h3>Article summary</h3>
               <p id="summary-text"></p>
             </div>
             <div class="rings" id="rings"></div>
-            <h3 style="font-family:var(--display);font-size:1rem;margin:0 0 0.75rem;">Signals (your deployment, your thresholds)</h3>
+            <h3 class="signals-heading">Signal breakdown</h3>
             <div class="signal-cards" id="signal-cards"></div>
             <div class="disclaimer" id="product-framing"></div>
           </div>
-        </div>
+        </section>
       </div>
-      <div class="queue-demo">
-        <h2>Batch / Queue demo</h2>
-        <p class="queue-copy">Submit jobs for async processing, then watch status transitions from <code>pending</code> to <code>succeeded</code> (or <code>failed</code>).</p>
+      </section>
+
+      <section class="workspace-panel" data-tab-panel="queue">
+        <div class="card">
+        <h2>Queue jobs</h2>
+        <p class="helper">Submit jobs for asynchronous processing. If workers are slow, you can still use Run now.</p>
         <form id="queue-form" action="#" onsubmit="return false;">
-          <div class="queue-grid">
+          <div class="split-grid">
             <div class="field">
-              <label for="queue-org-id">Org ID (tenant)</label>
+              <label for="queue-org-id">Organization ID</label>
               <input id="queue-org-id" type="text" value="demo-org" />
+            </div>
+            <div class="field">
+              <label for="queue-backend">Backend</label>
+              <select id="queue-backend">
+                <option value="classical">Classical (TF-IDF + Logistic Regression)</option>
+                <option value="bilstm">Keras BiLSTM (if trained)</option>
+                <option value="mini_transformer">Keras mini transformer (if trained)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="queue-title">Title</label>
+              <input id="queue-title" type="text" placeholder="Queue job title" />
             </div>
             <div class="field">
               <label for="queue-url">Article URL (optional)</label>
               <input id="queue-url" type="url" placeholder="https://example.com/article" />
             </div>
-            <div class="field">
-              <label for="queue-title">Title</label>
-              <input id="queue-title" type="text" placeholder="Queue demo headline" />
-            </div>
-            <div class="field">
-              <label for="queue-backend">Backend</label>
-              <select id="queue-backend">
-                <option value="classical">Classical (TF–IDF + LR)</option>
-                <option value="bilstm">Keras BiLSTM (if trained)</option>
-                <option value="mini_transformer">Keras mini transformer (if trained)</option>
-              </select>
-            </div>
           </div>
           <div class="field">
             <label for="queue-body">Body</label>
-            <textarea id="queue-body" rows="4" placeholder="Paste article text for async queue processing"></textarea>
+            <textarea id="queue-body" rows="4" placeholder="Paste article text for queued analysis"></textarea>
           </div>
-          <div class="queue-actions">
-            <button id="queue-submit-btn" type="submit" class="btn-primary queue-btn">Submit queue job</button>
-            <button id="queue-refresh-btn" type="button" class="btn-hero btn-hero-secondary">Refresh queue status</button>
+          <div class="button-row">
+            <button id="queue-submit-btn" type="submit" class="btn btn-primary">Submit queue job</button>
+            <button id="queue-refresh-btn" type="button" class="btn btn-soft">Refresh queue</button>
+          </div>
+          <div class="button-row" id="queue-run-now-wrap" hidden>
+            <button id="queue-run-now-btn" type="button" class="btn btn-primary">Run now (sync)</button>
+            <p class="field-hint" id="queue-run-now-note">This queued job can be run immediately on the API server.</p>
           </div>
           <div class="err" id="queue-err" hidden></div>
           <p class="field-hint" id="queue-last-job"></p>
         </form>
         <div id="queue-list" class="queue-list"></div>
-      </div>
-    </section>
-
-    <section id="pricing" class="page" data-page="pricing">
-      <div class="hero" style="padding-top: 1rem;">
-        <h1>Pricing</h1>
-        <p class="sub">MVP tiers for teams that need triage, API access, and optional dedicated support. Contact us for enterprise SLAs.</p>
-      </div>
-      <div class="price-grid">
-        <div class="price-card">
-          <h3>Starter</h3>
-          <div class="amt">Free</div>
-          <p style="color:var(--muted);margin:0;font-size:0.9rem;">Self-hosted or shared demo limits.</p>
-          <ul>
-            <li>Dashboard + paste/URL analyze</li>
-            <li>OpenAPI at <code>/openapi.json</code></li>
-            <li>Community support</li>
-          </ul>
         </div>
-        <div class="price-card featured">
-          <h3>Team</h3>
-          <div class="amt">Custom</div>
-          <p style="color:var(--muted);margin:0;font-size:0.9rem;">API key auth, rate limits, usage reporting.</p>
-          <ul>
-            <li><code>X-API-Key</code> + audit logs</li>
-            <li>Higher throughput</li>
-            <li>Newsroom onboarding</li>
-          </ul>
-        </div>
-        <div class="price-card">
-          <h3>Enterprise</h3>
-          <div class="amt">Custom</div>
-          <p style="color:var(--muted);margin:0;font-size:0.9rem;">VPC, SSO, custom models, SLA.</p>
-          <ul>
-            <li>Private deployment</li>
-            <li>Custom fine-tuning pipeline</li>
-            <li>Dedicated success engineer</li>
-          </ul>
-        </div>
-      </div>
-    </section>
+      </section>
 
-    <section id="docs" class="page" data-page="docs">
-      <div class="hero" style="padding-top: 1rem;">
-        <h1>Documentation &amp; API</h1>
-        <p class="sub">Integrate <code>POST /api/v1/analyze</code> into your CMS, alerts, or internal tools. Responses include ML scores and a <code>platform</code> block for UI.</p>
-      </div>
-      <div class="card" style="margin-bottom:1.25rem;">
-        <h3>OpenAPI</h3>
-        <p>Interactive schema: <a href="/openapi.json" target="_blank" rel="noopener">/openapi.json</a> — import into Postman or generate a client.</p>
-      </div>
-      <div class="card">
-        <h3>Example: analyze paste</h3>
-        <pre class="code" id="curl-paste"></pre>
-      </div>
-      <div class="card" style="margin-top:1.25rem;">
-        <h3>Example: analyze URL</h3>
-        <pre class="code" id="curl-url"></pre>
-      </div>
-      <div class="card" style="margin-top:1.25rem;">
-        <h3>Usage metering (per org)</h3>
-        <p style="color:var(--muted);margin:0 0 0.75rem;font-size:0.95rem;">After you configure API keys on the server, each org can query how many <code>POST /api/v1/analyze</code> calls were counted for their key (SQLite on the server; not shown in anonymous demo mode).</p>
-        <pre class="code" id="curl-usage"></pre>
-      </div>
-    </section>
-
-    <section id="security" class="page" data-page="security">
-      <div class="hero" style="padding-top: 1rem;">
-        <h1>Security &amp; data</h1>
-        <p class="sub">Design for newsrooms and compliance-minded teams: optional API keys, no training on your payloads by default, and clear separation of triage vs. ground truth.</p>
-      </div>
-      <div class="grid-3">
+      <section class="workspace-panel" data-tab-panel="cases">
         <div class="card">
-          <h3>Authentication</h3>
-          <p>Use <code>PLATFORM_API_KEY</code> for a single tenant, or <code>PLATFORM_API_KEYS</code> (JSON map of key → org id) for multiple customers. Clients send <code>X-API-Key</code>; secrets never appear in JSON responses. Successful analyzes may include <code>tenant.org_id</code>.</p>
+        <h2>Case management</h2>
+        <p class="helper">Create and update editorial cases. State and assignee changes are recorded by the backend.</p>
+        <form id="cases-form" action="#" onsubmit="return false;">
+          <div class="split-grid">
+            <div class="field">
+              <label for="cases-org-id">Organization ID</label>
+              <input id="cases-org-id" type="text" value="demo-org" />
+            </div>
+            <div class="field">
+              <label for="cases-title">Case title</label>
+              <input id="cases-title" type="text" placeholder="Potential misinformation claim" />
+            </div>
+            <div class="field">
+              <label for="cases-assignee">Assignee</label>
+              <input id="cases-assignee" type="text" placeholder="editor@desk" />
+            </div>
+            <div class="field">
+              <label for="cases-severity">Severity (0-1)</label>
+              <input id="cases-severity" type="number" min="0" max="1" step="0.01" value="0.7" />
+            </div>
+          </div>
+          <div class="button-row">
+            <button id="cases-create-btn" type="submit" class="btn btn-primary">Create case</button>
+            <button id="cases-create-from-input-btn" type="button" class="btn btn-soft">Create from current input</button>
+            <button id="cases-refresh-btn" type="button" class="btn btn-soft">Refresh cases</button>
+          </div>
+          <div class="err" id="cases-err" hidden></div>
+        </form>
+        <div id="cases-list" class="queue-list"></div>
+        </div>
+      </section>
+
+      <section class="workspace-panel" data-tab-panel="summary">
+        <div class="summary-grid">
+          <article class="card metric-card">
+            <h3>Latest analysis state</h3>
+            <p id="summary-latest-analysis">No analysis run in this session.</p>
+          </article>
+          <article class="card metric-card">
+            <h3>Queue monitor</h3>
+            <p id="summary-queue-health">Queue status will appear after refresh or submit.</p>
+          </article>
+          <article class="card metric-card">
+            <h3>Cases monitor</h3>
+            <p id="summary-cases-health">Case counts appear after loading cases.</p>
+          </article>
         </div>
         <div class="card">
-          <h3>URL fetch safety</h3>
-          <p>URL ingestion uses size limits and blocks private/reserved hosts to reduce SSRF risk. Allowlists can be tightened per deployment.</p>
+          <h3>API quick reference</h3>
+          <pre class="code" id="curl-paste"></pre>
+          <pre class="code" id="curl-url"></pre>
+          <pre class="code" id="curl-usage"></pre>
         </div>
-        <div class="card">
-          <h3>Your data</h3>
-          <p>Analysis is for real-time triage. Fine-tuning on customer data is a separate, explicit agreement — not the default path.</p>
-        </div>
-      </div>
-      <p class="disclaimer" style="border:none;margin-top:2rem;">
-        Legacy teacher UI remains at <a href="/classic">/classic</a>. This product shell is served at <code>/</code>.
-      </p>
-    </section>
-  </div>
+      </section>
+    </div>
+  </main>
 
   <footer class="footer-site">
-    <span id="footer-brand">News Trust Platform</span> — MVP. Scores are assistive, not legal or journalistic verdicts.
+    <span id="footer-brand">News Trust Platform</span> - Scores are assistive signals, not final editorial verdicts.
   </footer>
 
-  <!-- Nav highlight only. Panel visibility = CSS :target + ids (#dashboard matches href="#dashboard"). Do not preventDefault on in-page links. -->
-  <script>
-(function () {
-  var ok = { home: 1, dashboard: 1, pricing: 1, docs: 1, security: 1 };
-  function navSync() {
-    var params = new URLSearchParams(location.search);
-    var q = (params.get("tab") || "").trim();
-    if (q && ok[q] && (!location.hash || location.hash === "#")) {
-      location.hash = "#" + q;
-    }
-    var raw = ((location.hash || "#home").replace(/^#/, "") || "home").trim();
-    if (!ok[raw]) raw = "home";
-    document.querySelectorAll("section.page[data-page]").forEach(function (el) {
-      el.classList.toggle("active", el.getAttribute("data-page") === raw);
-    });
-    document.querySelectorAll(".nav-links a[data-page]").forEach(function (a) {
-      a.classList.toggle("active", a.getAttribute("data-page") === raw);
-    });
-    var cta = document.querySelector(".nav-cta[data-page]");
-    if (cta) cta.classList.toggle("active", cta.getAttribute("data-page") === raw);
-  }
-  window.addEventListener("hashchange", navSync);
-  window.addEventListener("load", navSync);
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", navSync);
-  else navSync();
-})();
-  </script>
   <script
-    src="assets/platform.js?v=9"
+    src="assets/platform.js?v=11"
     defer
     onerror="document.getElementById('asset-load-err').hidden=false"
   ></script>

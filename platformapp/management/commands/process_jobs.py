@@ -37,7 +37,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser: Any) -> None:
         parser.add_argument("--once", action="store_true", help="Process up to --max-jobs and exit.")
-        parser.add_argument("--poll-interval", type=float, default=2.0, help="Seconds to wait between polls.")
+        parser.add_argument("--poll-interval", type=float, default=0.25, help="Seconds to wait between polls.")
         parser.add_argument("--max-jobs", type=int, default=1000, help="Max jobs processed in this invocation.")
         parser.add_argument("--worker-name", type=str, default="worker-1", help="Worker identity for heartbeat.")
 
@@ -67,7 +67,18 @@ class Command(BaseCommand):
                 teacher_mode=job.teacher_mode,
             )
             try:
+                started = time.perf_counter()
+                claimed_at = timezone.now()
+                queue_wait_ms = max(
+                    0,
+                    int((claimed_at - job.submitted_at).total_seconds() * 1000),
+                )
                 result = run_analysis_job(req)
+                result.setdefault("platform", {})
+                result["platform"]["latency"] = {
+                    "queue_wait_ms": queue_wait_ms,
+                    "processing_ms": max(0, int((time.perf_counter() - started) * 1000)),
+                }
                 job.status = AnalysisJob.Status.SUCCEEDED
                 job.processed_at = timezone.now()
                 job.error = ""

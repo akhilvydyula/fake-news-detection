@@ -11,6 +11,20 @@
   var brandLogo = document.getElementById("brand-logo");
   var footerBrand = document.getElementById("footer-brand");
   var heroBrandLine = document.getElementById("hero-brand-line");
+  var stickyStatus = document.getElementById("sticky-status");
+
+  function setStickyStatus(message, kind) {
+    if (!stickyStatus) return;
+    if (!message) {
+      stickyStatus.textContent = "";
+      stickyStatus.className = "sticky-status is-hidden";
+      return;
+    }
+    stickyStatus.textContent = message;
+    stickyStatus.className = "sticky-status";
+    if (kind === "warn") stickyStatus.classList.add("warn");
+    if (kind === "error") stickyStatus.classList.add("error");
+  }
 
   async function loadHealth() {
     try {
@@ -80,7 +94,7 @@
     r.addEventListener("change", function () {
       var url = r.value === "url";
       if (pasteFields) pasteFields.style.display = url ? "none" : "";
-      if (urlFields) urlFields.style.display = url ? "" : "none";
+      if (urlFields) urlFields.hidden = !url;
     });
   });
 
@@ -98,6 +112,21 @@
   var analysisResultsAnchor = document.getElementById("analysis-results");
   var insightPanel = document.getElementById("insight-panel");
 
+  var latestAnalyzeSummary = document.getElementById("summary-latest-analysis");
+  var queueHealthSummary = document.getElementById("summary-queue-health");
+  var casesHealthSummary = document.getElementById("summary-cases-health");
+  var badgeHighRisk = document.getElementById("badge-high-risk");
+  var badgePendingReview = document.getElementById("badge-pending-review");
+
+  function updateTopbarBadges(highRiskCount, pendingCount) {
+    if (badgeHighRisk && highRiskCount != null) {
+      badgeHighRisk.textContent = String(highRiskCount) + " high risk";
+    }
+    if (badgePendingReview && pendingCount != null) {
+      badgePendingReview.textContent = String(pendingCount) + " pending review";
+    }
+  }
+
   function setAnalyzeStatus(text, kind) {
     if (!analyzeStatusEl) return;
     if (!text) {
@@ -109,6 +138,11 @@
     analyzeStatusEl.textContent = text;
     analyzeStatusEl.hidden = false;
     analyzeStatusEl.className = "analyze-status" + (kind === "ok" ? " analyze-status-ok" : kind === "err" ? " analyze-status-err" : "");
+  }
+
+  function setSummaryText(el, text) {
+    if (!el) return;
+    el.textContent = text;
   }
 
   function ringCard(label, value, caption) {
@@ -137,6 +171,7 @@
 
   function renderInsightResults(data) {
     setAnalyzeStatus("Insight complete — classical keyword breakdown below.", "ok");
+    setStickyStatus("Insight completed successfully.", null);
     if (resultsPlaceholder) resultsPlaceholder.hidden = true;
     if (resultsContent) resultsContent.hidden = false;
     if (insightPanel) {
@@ -146,6 +181,7 @@
     if (ringsEl) ringsEl.innerHTML = "";
     if (signalCardsEl) signalCardsEl.innerHTML = "";
     if (framingEl) framingEl.innerHTML = "";
+    setSummaryText(latestAnalyzeSummary, "Latest run used classical insight mode.");
 
     var fr = data.fake_risk || {};
     var pct =
@@ -248,6 +284,7 @@
 
   function renderResults(data) {
     setAnalyzeStatus("Analysis complete — scores and signals are below.", "ok");
+    setStickyStatus("Analysis completed successfully.", null);
     if (resultsPlaceholder) resultsPlaceholder.hidden = true;
     if (resultsContent) resultsContent.hidden = false;
     if (insightPanel) {
@@ -257,6 +294,11 @@
 
     var plat = data.platform || {};
     var dims = plat.dimensions || {};
+    var comp = dims.composite_attention_0_to_1 != null ? Math.round(dims.composite_attention_0_to_1 * 100) : null;
+    if (comp == null && data.score_toward_review_0_to_1 != null) comp = Math.round(Number(data.score_toward_review_0_to_1) * 100);
+    if (comp == null) comp = 0;
+    setSummaryText(latestAnalyzeSummary, "Latest composite attention score: " + comp + "%.");
+    updateTopbarBadges(comp >= 70 ? 1 : 0, comp >= 45 ? 1 : 0);
 
     if (summaryText && summaryBox) {
       var sum = plat.article_summary || "";
@@ -371,6 +413,8 @@
     var useInsight = !!(insightChk && insightChk.checked);
 
     var payload = {};
+    var orgIdInput = document.getElementById("cases-org-id") || document.getElementById("queue-org-id");
+    payload.org_id = ((orgIdInput && orgIdInput.value) || "demo-org").trim() || "demo-org";
     if (mode === "url") {
       var urlEl = document.getElementById("url");
       var url = (urlEl && urlEl.value && urlEl.value.trim()) || "";
@@ -396,6 +440,7 @@
           errEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
         }
         setAnalyzeStatus("", null);
+        setStickyStatus("Please add enough text before running analysis.", "warn");
         return;
       }
     }
@@ -419,6 +464,7 @@
       setAnalyzeStatus("Analyzing… (" + s + "s)", null);
     }, 500);
     setAnalyzeStatus("Analyzing… (0s)", null);
+    setStickyStatus("Analyzing article...", null);
     if (analysisResultsAnchor && analysisResultsAnchor.scrollIntoView) {
       try {
         analysisResultsAnchor.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -437,7 +483,7 @@
         } catch (_) {}
       }, analyzeTimeoutMs);
 
-    fetch(apiUrl("/api/v1/analyze"), {
+    fetch(apiUrl("/api/v1/detect"), {
       method: "POST",
       headers: headers,
       body: JSON.stringify(payload),
@@ -464,6 +510,7 @@
               " If this server requires a key, paste it into “API key” below and try again.";
           }
           setAnalyzeStatus("Request failed — see message under the button.", "err");
+          setStickyStatus("Analysis request failed.", "error");
           if (errEl) {
             errEl.textContent = msg;
             errEl.hidden = false;
@@ -476,9 +523,14 @@
             renderInsightResults(res.data);
           } else {
             renderResults(res.data);
+            if (res.data && res.data.alert_recommended && res.data.alert_reason) {
+              setAnalyzeStatus("Alert recommended: " + res.data.alert_reason, "err");
+              setStickyStatus("Alert recommended by model output.", "warn");
+            }
           }
         } catch (e2) {
           setAnalyzeStatus("Could not render results.", "err");
+          setStickyStatus("Result rendering failed.", "error");
           if (errEl) {
             errEl.textContent = "Could not render results: " + String((e2 && e2.message) || e2);
             errEl.hidden = false;
@@ -489,6 +541,7 @@
       .catch(function (e) {
         var aborted = e && (e.name === "AbortError" || /aborted/i.test(String(e.message || "")));
         setAnalyzeStatus(aborted ? "Timed out waiting for the server." : "Network error — start the server from the project root.", "err");
+        setStickyStatus(aborted ? "Analysis timed out." : "Network error while analyzing.", "error");
         if (errEl) {
           errEl.textContent = aborted
             ? "No response after " +
@@ -541,7 +594,7 @@
         pasteRadio.dispatchEvent(new Event("change", { bubbles: true }));
       }
       if (pasteFields) pasteFields.style.display = "";
-      if (urlFields) urlFields.style.display = "none";
+      if (urlFields) urlFields.hidden = true;
       var tEl = document.getElementById("title");
       var bEl = document.getElementById("article-body");
       if (tEl) tEl.value = SAMPLE_ARTICLE.title;
@@ -556,13 +609,28 @@
     });
   }
 
+  var loadSampleOnlyBtn = document.getElementById("btn-load-sample-only");
+  if (loadSampleOnlyBtn) {
+    loadSampleOnlyBtn.addEventListener("click", function () {
+      var pasteRadio = analyzeForm && analyzeForm.querySelector('input[name="mode"][value="paste"]');
+      if (pasteRadio) {
+        pasteRadio.checked = true;
+        pasteRadio.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      if (pasteFields) pasteFields.style.display = "";
+      if (urlFields) urlFields.hidden = true;
+      var tEl = document.getElementById("title");
+      var bEl = document.getElementById("article-body");
+      if (tEl) tEl.value = SAMPLE_ARTICLE.title;
+      if (bEl) bEl.value = SAMPLE_ARTICLE.body;
+      setStickyStatus("Sample article loaded.", null);
+    });
+  }
+
   function maybeDemoRunFromQuery() {
     try {
       var params = new URLSearchParams(location.search || "");
       if (params.get("demo") !== "1" || !analyzeForm) return;
-      if (!location.hash || location.hash === "#" || location.hash === "#home") {
-        location.hash = "#dashboard";
-      }
       setTimeout(function () {
         var pasteRadio = analyzeForm.querySelector('input[name="mode"][value="paste"]');
         if (pasteRadio) {
@@ -570,7 +638,7 @@
           pasteRadio.dispatchEvent(new Event("change", { bubbles: true }));
         }
         if (pasteFields) pasteFields.style.display = "";
-        if (urlFields) urlFields.style.display = "none";
+        if (urlFields) urlFields.hidden = true;
         var tEl = document.getElementById("title");
         var bEl = document.getElementById("article-body");
         if (tEl) tEl.value = SAMPLE_ARTICLE.title;
@@ -621,9 +689,18 @@
     var queueList = document.getElementById("queue-list");
     if (!queueList) return;
     if (!jobs || !jobs.length) {
-      queueList.innerHTML = '<p class="field-hint">No queued jobs yet for this org.</p>';
+      queueList.innerHTML = '<div class="empty-state"><p>No queue jobs yet.</p><small>Submit a job to start tracking status.</small></div>';
+      setSummaryText(queueHealthSummary, "No queue jobs found.");
       return;
     }
+    var pendingCount = jobs.filter(function (j) {
+      return j.status === "pending" || j.status === "processing";
+    }).length;
+    var highRiskCount = jobs.filter(function (j) {
+      return j && j.result && j.result.raw && Number((j.result.raw.platform || {}).risk_score || 0) >= 0.7;
+    }).length;
+    updateTopbarBadges(highRiskCount, pendingCount);
+    setSummaryText(queueHealthSummary, jobs.length + " jobs listed, " + pendingCount + " active.");
     queueList.innerHTML = jobs
       .map(function (job) {
         var rid = String(job.job_id || "").slice(0, 8);
@@ -664,6 +741,47 @@
     }
     queueErr.hidden = false;
     queueErr.textContent = message;
+    setStickyStatus(message, "error");
+  }
+
+  var QUEUE_REFRESH_INTERVAL_MS = 1000;
+  var QUEUE_JOB_POLL_INTERVAL_MS = 400;
+  var QUEUE_JOB_POLL_TIMEOUT_MS = 15000;
+  var queueAutoRefreshTimer = null;
+  var queuePendingRunNowJobId = null;
+
+  function formatLatencyHint(job) {
+    if (!job || job.total_ms == null) return "";
+    var q = job.queue_wait_ms != null ? String(job.queue_wait_ms) + "ms queue" : "";
+    var p = job.processing_ms != null ? String(job.processing_ms) + "ms run" : "";
+    var parts = [q, p].filter(Boolean).join(" + ");
+    return parts
+      ? "Latency " + parts + " = " + String(job.total_ms) + "ms total."
+      : "Latency " + String(job.total_ms) + "ms total.";
+  }
+
+  function showRunNowAction(jobId, message) {
+    queuePendingRunNowJobId = jobId || null;
+    var wrap = document.getElementById("queue-run-now-wrap");
+    var btn = document.getElementById("queue-run-now-btn");
+    var note = document.getElementById("queue-run-now-note");
+    if (!wrap || !btn || !note || !queuePendingRunNowJobId) return;
+    note.textContent = message || "Worker is slow or unavailable. Run this queued job now?";
+    btn.disabled = false;
+    wrap.hidden = false;
+  }
+
+  function hideRunNowAction() {
+    queuePendingRunNowJobId = null;
+    var wrap = document.getElementById("queue-run-now-wrap");
+    if (wrap) wrap.hidden = true;
+  }
+
+  function clearQueueAutoRefresh() {
+    if (queueAutoRefreshTimer) {
+      clearInterval(queueAutoRefreshTimer);
+      queueAutoRefreshTimer = null;
+    }
   }
 
   async function refreshQueue() {
@@ -683,6 +801,109 @@
     }
   }
 
+  async function pollQueueJobUntilTerminal(jobId) {
+    var lastJob = document.getElementById("queue-last-job");
+    var startedAt = Date.now();
+    var seenStatus = null;
+
+    while (Date.now() - startedAt < QUEUE_JOB_POLL_TIMEOUT_MS) {
+      try {
+        var res = await fetch(apiUrl("/api/v1/jobs/" + encodeURIComponent(jobId)));
+        var data = await res.json();
+        if (!res.ok) {
+          queueError(formatErrorDetail(data && data.detail, res.status));
+          return;
+        }
+
+        var status = data.status || "pending";
+        if (status !== seenStatus && lastJob) {
+          seenStatus = status;
+          if (status === "pending") {
+            lastJob.textContent = "Job " + jobId + " queued…";
+          } else if (status === "processing") {
+            lastJob.textContent = "Job " + jobId + " running…";
+          } else if (status === "succeeded") {
+            lastJob.textContent = "Job " + jobId + " done.";
+          } else if (status === "failed") {
+            lastJob.textContent = "Job " + jobId + " failed.";
+          }
+        }
+
+        if (status === "succeeded" || status === "failed") {
+          hideRunNowAction();
+          await refreshQueue();
+          if (status === "succeeded" && data.result && data.result.raw) {
+            try {
+              renderResults(data.result.raw);
+              if (lastJob) {
+                var latency = formatLatencyHint(data);
+                if (latency) lastJob.textContent += " " + latency;
+              }
+            } catch (_) {}
+          } else if (status === "failed") {
+            queueError(data.error || "Job failed.");
+          }
+          return;
+        }
+      } catch (e) {
+        queueError("Could not poll job status: " + String((e && e.message) || e));
+        return;
+      }
+
+      await new Promise(function (resolve) {
+        setTimeout(resolve, QUEUE_JOB_POLL_INTERVAL_MS);
+      });
+    }
+
+    if (lastJob) {
+      lastJob.textContent =
+        "Job " +
+        jobId +
+        " is still running after " +
+        Math.round(QUEUE_JOB_POLL_TIMEOUT_MS / 1000) +
+        "s.";
+    }
+    queueError("Job is taking longer than expected. You can run it immediately.");
+    setStickyStatus("Queue job is slow. Run now is available.", "warn");
+    showRunNowAction(jobId, "Queue exceeded 15s timeout. Run this job synchronously now?");
+  }
+
+  async function runNowPendingJob() {
+    var orgId = ((document.getElementById("queue-org-id") || {}).value || "demo-org").trim() || "demo-org";
+    var btn = document.getElementById("queue-run-now-btn");
+    var lastJob = document.getElementById("queue-last-job");
+    if (!queuePendingRunNowJobId) return;
+    if (btn) btn.disabled = true;
+    queueError("");
+    try {
+      var res = await fetch(apiUrl("/api/v1/jobs/" + encodeURIComponent(queuePendingRunNowJobId) + "/run-now"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ org_id: orgId }),
+      });
+      var data = await res.json();
+      if (!res.ok) {
+        queueError(formatErrorDetail(data && data.detail, res.status));
+        return;
+      }
+      hideRunNowAction();
+      await refreshQueue();
+      if (data.status === "succeeded" && data.result && data.result.raw) {
+        renderResults(data.result.raw);
+        setStickyStatus("Run now completed successfully.", null);
+        if (lastJob) {
+          lastJob.textContent = "Job " + queuePendingRunNowJobId + " completed via Run now. " + formatLatencyHint(data);
+        }
+      } else if (data.status === "failed") {
+        queueError(data.error || "Run now failed.");
+      }
+    } catch (e3) {
+      queueError("Could not run job now: " + String((e3 && e3.message) || e3));
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
   async function submitQueueJob() {
     var queueBtn = document.getElementById("queue-submit-btn");
     var lastJob = document.getElementById("queue-last-job");
@@ -699,6 +920,7 @@
       return;
     }
     queueError("");
+    hideRunNowAction();
     if (queueBtn) queueBtn.disabled = true;
     try {
       var res = await fetch(apiUrl("/api/v1/jobs/submit"), {
@@ -714,7 +936,21 @@
       if (lastJob) {
         lastJob.textContent = "Latest job id: " + data.job_id + " (" + data.status + ")";
       }
+      setStickyStatus("Queue job submitted: " + data.job_id, null);
       await refreshQueue();
+      if (data.status === "succeeded") {
+        hideRunNowAction();
+        var immediate = await fetch(apiUrl("/api/v1/jobs/" + encodeURIComponent(data.job_id)));
+        var immediateData = await immediate.json();
+        if (immediate.ok && immediateData.result && immediateData.result.raw) {
+          renderResults(immediateData.result.raw);
+          if (lastJob) {
+            lastJob.textContent += " " + formatLatencyHint(immediateData);
+          }
+        }
+        return;
+      }
+      await pollQueueJobUntilTerminal(data.job_id);
     } catch (e2) {
       queueError("Could not submit job: " + String((e2 && e2.message) || e2));
     } finally {
@@ -722,12 +958,193 @@
     }
   }
 
+  var CASE_STATES = ["NEW", "UNDER_REVIEW", "VERIFIED", "ESCALATED", "CLOSED"];
+
+  function casesError(message) {
+    var el = document.getElementById("cases-err");
+    if (!el) return;
+    if (!message) {
+      el.hidden = true;
+      el.textContent = "";
+      return;
+    }
+    el.hidden = false;
+    el.textContent = message;
+  }
+
+  function caseStateOptions(selected) {
+    return CASE_STATES.map(function (state) {
+      return '<option value="' + state + '"' + (state === selected ? " selected" : "") + ">" + state + "</option>";
+    }).join("");
+  }
+
+  function renderCases(items) {
+    var list = document.getElementById("cases-list");
+    if (!list) return;
+    if (!items || !items.length) {
+      list.innerHTML = '<div class="empty-state"><p>No cases yet.</p><small>Create a case to begin triage tracking.</small></div>';
+      setSummaryText(casesHealthSummary, "No cases found.");
+      updateTopbarBadges(0, 0);
+      return;
+    }
+    var highRiskCases = items.filter(function (item) {
+      return Number(item.severity || 0) >= 0.7;
+    }).length;
+    var pendingReviewCases = items.filter(function (item) {
+      return String(item.state || "").toUpperCase() === "UNDER_REVIEW" || String(item.state || "").toUpperCase() === "NEW";
+    }).length;
+    updateTopbarBadges(highRiskCases, pendingReviewCases);
+    setSummaryText(casesHealthSummary, items.length + " cases loaded.");
+    list.innerHTML = items
+      .map(function (item) {
+        var rid = String(item.id || "").slice(0, 8);
+        var events = item.events || [];
+        var lastEvent = events.length ? events[events.length - 1] : null;
+        return (
+          '<article class="queue-item" data-case-id="' +
+          escapeHtml(String(item.id)) +
+          '">' +
+          '<div class="queue-item-top"><span class="queue-id">Case ' +
+          escapeHtml(rid) +
+          '</span><span class="queue-status">' +
+          escapeHtml(item.state || "NEW") +
+          "</span></div>" +
+          '<p class="queue-summary">' +
+          escapeHtml(item.title || "(untitled case)") +
+          "</p>" +
+          '<p class="field-hint">Severity: ' +
+          escapeHtml(String(item.severity || 0)) +
+          " · Assignee: " +
+          escapeHtml(item.assignee || "unassigned") +
+          "</p>" +
+          '<div class="queue-grid">' +
+          '<div class="field"><label>State</label><select class="case-state-select">' +
+          caseStateOptions(item.state || "NEW") +
+          '</select></div>' +
+          '<div class="field"><label>Assignee</label><input class="case-assignee-input" type="text" value="' +
+          escapeHtml(item.assignee || "") +
+          '"/></div></div>' +
+          '<div class="queue-actions"><button type="button" class="btn-hero btn-hero-secondary case-update-btn">Update case</button></div>' +
+          (lastEvent
+            ? '<p class="field-hint">Last event: ' +
+              escapeHtml(lastEvent.event_type) +
+              " (" +
+              escapeHtml(lastEvent.new_value || "-") +
+              ")</p>"
+            : "") +
+          "</article>"
+        );
+      })
+      .join("");
+  }
+
+  async function refreshCases() {
+    var orgId = ((document.getElementById("cases-org-id") || {}).value || "demo-org").trim() || "demo-org";
+    try {
+      var r = await fetch(apiUrl("/api/v1/cases?org_id=" + encodeURIComponent(orgId)));
+      var body = await r.json();
+      if (!r.ok) {
+        casesError(formatErrorDetail(body && body.detail, r.status));
+        return;
+      }
+      casesError("");
+      renderCases(body.cases || []);
+    } catch (e) {
+      casesError("Could not load cases: " + String((e && e.message) || e));
+    }
+  }
+
+  async function createCase(payload) {
+    var r = await fetch(apiUrl("/api/v1/cases"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    var body = await r.json();
+    if (!r.ok) throw new Error(formatErrorDetail(body && body.detail, r.status));
+    return body;
+  }
+
+  async function createCaseFromForm() {
+    var orgId = ((document.getElementById("cases-org-id") || {}).value || "demo-org").trim() || "demo-org";
+    var title = ((document.getElementById("cases-title") || {}).value || "").trim();
+    var assignee = ((document.getElementById("cases-assignee") || {}).value || "").trim();
+    var severity = Number(((document.getElementById("cases-severity") || {}).value || "0"));
+    var body = ((document.getElementById("article-body") || {}).value || "").trim();
+    try {
+      await createCase({
+        org_id: orgId,
+        title: title,
+        assignee: assignee,
+        severity: isNaN(severity) ? 0 : severity,
+        article_text: body,
+      });
+      await refreshCases();
+      setStickyStatus("Case created successfully.", null);
+    } catch (e) {
+      casesError("Could not create case: " + String((e && e.message) || e));
+    }
+  }
+
+  async function createCaseFromInputText() {
+    var orgId = ((document.getElementById("cases-org-id") || {}).value || "demo-org").trim() || "demo-org";
+    var title = ((document.getElementById("title") || {}).value || "").trim() || "Case from dashboard input";
+    var body = ((document.getElementById("article-body") || {}).value || "").trim();
+    if (body.length < 20) {
+      casesError("Add article text first, then create case from current input.");
+      return;
+    }
+    try {
+      await createCase({
+        org_id: orgId,
+        title: title,
+        article_text: body,
+        severity: Number(((document.getElementById("cases-severity") || {}).value || "0.7")) || 0.7,
+        assignee: ((document.getElementById("cases-assignee") || {}).value || "").trim(),
+      });
+      await refreshCases();
+      setStickyStatus("Case created from current input.", null);
+    } catch (e) {
+      casesError("Could not create case from input: " + String((e && e.message) || e));
+    }
+  }
+
+  async function updateCaseFromList(buttonEl) {
+    var card = buttonEl && buttonEl.closest("[data-case-id]");
+    if (!card) return;
+    var orgId = ((document.getElementById("cases-org-id") || {}).value || "demo-org").trim() || "demo-org";
+    var caseId = card.getAttribute("data-case-id");
+    var state = ((card.querySelector(".case-state-select") || {}).value || "NEW").trim();
+    var assignee = ((card.querySelector(".case-assignee-input") || {}).value || "").trim();
+    try {
+      var r = await fetch(apiUrl("/api/v1/cases/" + encodeURIComponent(caseId)), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ org_id: orgId, state: state, assignee: assignee }),
+      });
+      var body = await r.json();
+      if (!r.ok) {
+        casesError(formatErrorDetail(body && body.detail, r.status));
+        return;
+      }
+      casesError("");
+      await refreshCases();
+    } catch (e) {
+      casesError("Could not update case: " + String((e && e.message) || e));
+    }
+  }
+
   function init() {
     loadHealth();
     fillCurlExamples();
     maybeDemoRunFromQuery();
+    bindWorkspaceTabs();
     var queueForm = document.getElementById("queue-form");
     var queueRefresh = document.getElementById("queue-refresh-btn");
+    var queueRunNow = document.getElementById("queue-run-now-btn");
+    var casesForm = document.getElementById("cases-form");
+    var casesRefresh = document.getElementById("cases-refresh-btn");
+    var casesCreateFromInput = document.getElementById("cases-create-from-input-btn");
     if (queueForm) {
       queueForm.addEventListener("submit", function (e) {
         e.preventDefault();
@@ -739,8 +1156,60 @@
         refreshQueue();
       });
     }
+    if (queueRunNow) {
+      queueRunNow.addEventListener("click", function () {
+        runNowPendingJob();
+      });
+    }
+    if (casesForm) {
+      casesForm.addEventListener("submit", function (e) {
+        e.preventDefault();
+        createCaseFromForm();
+      });
+    }
+    if (casesRefresh) {
+      casesRefresh.addEventListener("click", function () {
+        refreshCases();
+      });
+    }
+    if (casesCreateFromInput) {
+      casesCreateFromInput.addEventListener("click", function () {
+        createCaseFromInputText();
+      });
+    }
+    document.addEventListener("click", function (e) {
+      if (!e.target) return;
+      if (e.target.classList && e.target.classList.contains("case-update-btn")) {
+        updateCaseFromList(e.target);
+      }
+    });
     refreshQueue();
-    setInterval(refreshQueue, 4000);
+    refreshCases();
+    clearQueueAutoRefresh();
+    queueAutoRefreshTimer = setInterval(refreshQueue, QUEUE_REFRESH_INTERVAL_MS);
+  }
+
+  function bindWorkspaceTabs() {
+    var tabButtons = Array.prototype.slice.call(document.querySelectorAll("[data-workspace-tab]"));
+    var tabPanels = Array.prototype.slice.call(document.querySelectorAll("[data-tab-panel]"));
+    if (!tabButtons.length || !tabPanels.length) return;
+    function activate(tabKey) {
+      tabButtons.forEach(function (btn) {
+        btn.classList.toggle("is-active", btn.getAttribute("data-workspace-tab") === tabKey);
+      });
+      tabPanels.forEach(function (panel) {
+        panel.classList.toggle("is-active", panel.getAttribute("data-tab-panel") === tabKey);
+      });
+      history.replaceState(null, "", location.pathname + location.search + "#tab-" + tabKey);
+    }
+    tabButtons.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        activate(btn.getAttribute("data-workspace-tab"));
+      });
+    });
+    var fromHash = (location.hash || "").replace("#tab-", "");
+    var valid = { analyze: 1, queue: 1, cases: 1, summary: 1 };
+    activate(valid[fromHash] ? fromHash : "analyze");
   }
 
   if (document.readyState === "loading") {
