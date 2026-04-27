@@ -27,3 +27,4 @@ mlflow>=2.16.0
 # Dev / CI
 pytest>=8.0.0
 pytest-django>=4.8.0
+wheel>=0.46.2

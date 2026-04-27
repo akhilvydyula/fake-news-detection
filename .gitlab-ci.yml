@@ -51,6 +51,7 @@ dependency_audit:
   timeout: 40m
   allow_failure: true
   script:
+    - python -m pip install --upgrade "wheel>=0.46.2"
     - pip install pip-audit
     - pip install -e ".[dev]"
     - |
