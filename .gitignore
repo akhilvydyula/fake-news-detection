@@ -13,6 +13,10 @@ data/processed/*
 !data/processed/.gitkeep
 artifacts/*
 !artifacts/.gitkeep
+!artifacts/classical/
+!artifacts/classical/logreg_tfidf.joblib
+!artifacts/classical/keyword_hints.json
+!artifacts/metrics.json
 *.log
 .DS_Store
 mlruns/

@@ -25,11 +25,11 @@
 
 .PHONY: help venv setup install migrate score-feeds train train-quick serve dev ui run streamlit streamlit-ui product test doctor mlflow-ui lab-train stop restart
 
-PYTHON ?= python
+PYTHON ?= $(if $(wildcard .venv/Scripts/python.exe),.venv/Scripts/python.exe,$(if $(wildcard .venv/bin/python),.venv/bin/python,python))
 PORT ?= 8000
 
-# Virtualenv interpreter (Unix / WSL / Git Bash). On Windows without bash, use run.bat.
-VENV_PY := .venv/bin/python
+# Virtualenv interpreter (Windows first, then Unix / WSL / Git Bash).
+VENV_PY := $(if $(wildcard .venv/Scripts/python.exe),.venv/Scripts/python.exe,.venv/bin/python)
 
 help:
 	@echo "Streamlit product UI (recommended; no model training):"

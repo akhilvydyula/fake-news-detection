@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 import re
+from collections import Counter
 from html import escape
 from typing import Any
 
@@ -17,6 +18,7 @@ import django
 import httpx
 import pandas as pd
 import streamlit as st
+from django.apps import apps
 
 from src.ingest.fetch_url import fetch_url_text
 from src.service.enrichment import enrich_platform_payload
@@ -25,7 +27,9 @@ from src.service.predictor import (
     artifacts_ready,
     build_api_response,
     build_full_text,
+    explain_classical_for_text,
     load_metrics_json,
+    predict_proba_fake,
     product_framing,
     warm_classical_cache,
 )
@@ -38,15 +42,158 @@ SAMPLE_BODY = (
     "Critics asked for stronger parking and accessibility measures near stations."
 )
 
+EVIDENCE_STOPWORDS = {
+    "a",
+    "about",
+    "above",
+    "after",
+    "again",
+    "against",
+    "all",
+    "am",
+    "an",
+    "and",
+    "any",
+    "are",
+    "as",
+    "at",
+    "be",
+    "because",
+    "been",
+    "before",
+    "being",
+    "below",
+    "between",
+    "both",
+    "but",
+    "by",
+    "can",
+    "could",
+    "did",
+    "do",
+    "does",
+    "doing",
+    "down",
+    "during",
+    "each",
+    "few",
+    "for",
+    "from",
+    "further",
+    "had",
+    "has",
+    "have",
+    "having",
+    "he",
+    "her",
+    "here",
+    "hers",
+    "him",
+    "his",
+    "how",
+    "i",
+    "if",
+    "in",
+    "into",
+    "is",
+    "it",
+    "its",
+    "itself",
+    "just",
+    "me",
+    "more",
+    "most",
+    "my",
+    "no",
+    "nor",
+    "not",
+    "of",
+    "off",
+    "on",
+    "once",
+    "only",
+    "or",
+    "other",
+    "our",
+    "out",
+    "over",
+    "own",
+    "same",
+    "said",
+    "says",
+    "she",
+    "should",
+    "so",
+    "some",
+    "such",
+    "than",
+    "that",
+    "the",
+    "their",
+    "them",
+    "then",
+    "there",
+    "these",
+    "they",
+    "this",
+    "those",
+    "through",
+    "to",
+    "too",
+    "under",
+    "until",
+    "up",
+    "very",
+    "was",
+    "we",
+    "were",
+    "what",
+    "when",
+    "where",
+    "which",
+    "while",
+    "who",
+    "whom",
+    "why",
+    "with",
+    "you",
+    "your",
+    "add",
+    "advertisement",
+    "bbc",
+    "christie",
+    "cookie",
+    "davies",
+    "google",
+    "owen",
+    "preferred",
+    "save",
+    "share",
+    "sign",
+    "subscribe",
+    "video",
+}
+
 
 def _brand() -> str:
     return os.environ.get("PLATFORM_BRAND_NAME", "News Trust Platform")
 
 
+def _best_available_backend(ready: dict[str, bool]) -> Backend:
+    # Classical is the stable default for Streamlit demos: fast, interpretable, and
+    # avoids TensorFlow startup on every app rerun. Neural backends remain selectable.
+    return "classical"
+
+
+def _mark_backend_selected() -> None:
+    st.session_state.backend_user_selected = True
+
+
 @st.cache_resource(show_spinner=False)
 def _setup_django() -> None:
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "newstrust.settings")
-    django.setup()
+    if not apps.ready:
+        django.setup()
 
 
 @st.cache_resource(show_spinner=False)
@@ -54,6 +201,70 @@ def _warm_models() -> dict[str, bool]:
     """Load the classical model once and return artifact availability."""
     warm_classical_cache()
     return artifacts_ready()
+
+
+def _candidate_evidence_terms(text: str, limit: int = 24) -> list[str]:
+    words = re.findall(r"\b[A-Za-z][A-Za-z'-]{2,}\b", text)
+    counts = Counter(w.lower().strip("-'") for w in words)
+    candidates = [
+        (term, count)
+        for term, count in counts.items()
+        if len(term) >= 5 and term not in EVIDENCE_STOPWORDS and not term.isnumeric()
+    ]
+    candidates.sort(key=lambda item: (item[1], len(item[0])), reverse=True)
+    return [term for term, _ in candidates[:limit]]
+
+
+@st.cache_data(show_spinner=False, max_entries=64)
+def _perturbation_evidence(text: str, backend: Backend, base_score: float) -> list[dict[str, Any]]:
+    """Measure which words move the selected model's score on this unseen text."""
+    evidence: list[dict[str, Any]] = []
+    text_slice = text[:6000]
+    slice_score = predict_proba_fake(text_slice, backend)
+    reference_score = float(slice_score) if slice_score is not None else base_score
+    candidate_limit = 24 if backend == "classical" else 8
+    for term in _candidate_evidence_terms(text_slice, limit=candidate_limit):
+        pattern = re.compile(rf"(?<![\w']){re.escape(term)}(?![\w'])", re.IGNORECASE)
+        if not pattern.search(text_slice):
+            continue
+        perturbed = pattern.sub(" ", text_slice)
+        new_score = predict_proba_fake(perturbed, backend)
+        if new_score is None:
+            continue
+        delta = reference_score - float(new_score)
+        if abs(delta) < 0.003:
+            continue
+        evidence.append(
+            {
+                "phrase": term,
+                "effect": "pushes_toward_review" if delta > 0 else "pushes_toward_reliable",
+                "strength": round(abs(delta), 6),
+            }
+        )
+    evidence.sort(key=lambda item: float(item["strength"]), reverse=True)
+    return evidence[:16]
+
+
+def _attach_interpretable_evidence(payload: dict[str, Any], text: str, backend: Backend) -> dict[str, Any]:
+    """Attach evidence based on how the active model reacts to this exact unseen article."""
+    score = float(payload.get("score_toward_review_0_to_1") or 0.0)
+    perturbed = _clean_phrases(_perturbation_evidence(text, backend, score))
+    interp = payload.setdefault("interpretability", {})
+    if perturbed:
+        interp["phrases_in_your_text"] = perturbed
+        interp["evidence_method"] = "model_perturbation"
+        interp["plain_explanation"] = (
+            "For this unseen article, we remove meaningful candidate words one at a time, re-run the active model, "
+            "and highlight the words that changed the fake/real probability the most."
+        )
+        return payload
+
+    classical_phrases = explain_classical_for_text(text, top_k=30)
+    cleaned = _clean_phrases(classical_phrases)
+    if cleaned:
+        interp["phrases_in_your_text"] = cleaned[:16]
+        interp["evidence_method"] = "classical_linear_explainer"
+    return payload
 
 
 def _run_rss_ingest() -> dict[str, int]:
@@ -94,6 +305,7 @@ def _analyze_text(title: str, body: str, backend: Backend) -> dict[str, Any]:
             f"Model files for '{backend}' are missing. Use the Classical backend or add trained artifacts."
         )
     out = enrich_platform_payload(base, text, backend)
+    out = _attach_interpretable_evidence(out, text, backend)
     out["source"] = {"type": "paste"}
     st.session_state.last_source_text = text
     return out
@@ -116,6 +328,7 @@ def _analyze_url(url: str, backend: Backend) -> dict[str, Any]:
             f"Model files for '{backend}' are missing. Use the Classical backend or add trained artifacts."
         )
     out = enrich_platform_payload(base, text, backend)
+    out = _attach_interpretable_evidence(out, text, backend)
     out["source"] = {"type": "url", **meta}
     st.session_state.last_source_text = text
     return out
@@ -127,6 +340,30 @@ def _score_label(score: float) -> tuple[str, str]:
     if score < 0.55:
         return "Medium", "medium"
     return "Elevated", "high"
+
+
+def _ai_verdict(score: float) -> dict[str, str]:
+    prediction = "Fake" if score >= 0.5 else "Real"
+    confidence = max(score, 1 - score)
+    if 0.45 <= score < 0.55:
+        css = "review"
+        headline = f"{prediction} leaning, needs human review"
+        detail = "The model is close to the decision boundary, so treat this as an uncertain triage result."
+    elif prediction == "Fake":
+        css = "fake"
+        headline = "Likely fake / high-risk content"
+        detail = "The text has stronger misinformation-style signals and should be checked before use."
+    else:
+        css = "real"
+        headline = "Likely real / lower-risk content"
+        detail = "The text has lower review pressure, but normal source verification still applies."
+    return {
+        "prediction": prediction,
+        "css": css,
+        "headline": headline,
+        "detail": detail,
+        "confidence": f"{confidence:.0%}",
+    }
 
 
 def _pct(x: Any) -> str:
@@ -180,15 +417,39 @@ def _model_quality() -> dict[str, Any]:
     }
 
 
+def _is_good_evidence_phrase(phrase: Any, strength: Any = 0.0) -> bool:
+    phrase_text = str(phrase or "").strip().lower()
+    if not phrase_text:
+        return False
+    try:
+        if float(strength or 0.0) <= 0:
+            return False
+    except (TypeError, ValueError):
+        return False
+    tokens = re.findall(r"[a-z][a-z'-]*", phrase_text)
+    if not tokens:
+        return False
+    if len(tokens) == 1:
+        token = tokens[0].strip("-'")
+        return len(token) >= 4 and token not in EVIDENCE_STOPWORDS
+    meaningful = [t for t in tokens if len(t) >= 3 and t not in EVIDENCE_STOPWORDS]
+    return len(meaningful) >= 1
+
+
+def _clean_phrases(phrases: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [p for p in phrases if _is_good_evidence_phrase(p.get("phrase"), p.get("strength"))]
+
+
 def _split_phrases(phrases: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    review = [p for p in phrases if p.get("effect") == "pushes_toward_review"]
-    reliable = [p for p in phrases if p.get("effect") == "pushes_toward_reliable"]
+    cleaned = _clean_phrases(phrases)
+    review = [p for p in cleaned if p.get("effect") == "pushes_toward_review"]
+    reliable = [p for p in cleaned if p.get("effect") == "pushes_toward_reliable"]
     return review, reliable
 
 
 def _phrase_df(phrases: list[dict[str, Any]]) -> pd.DataFrame:
     rows = []
-    for p in phrases:
+    for p in _clean_phrases(phrases):
         effect = str(p.get("effect", "")).replace("_", " ")
         rows.append(
             {
@@ -206,16 +467,17 @@ def _highlight_text(text: str, review_phrases: list[dict[str, Any]], reliable_ph
     snippets: list[tuple[str, str]] = []
     for p in review_phrases[:10]:
         phrase = str(p.get("phrase", "")).strip()
-        if len(phrase) >= 3:
+        if _is_good_evidence_phrase(phrase, p.get("strength")):
             snippets.append((phrase, "hl-review"))
     for p in reliable_phrases[:8]:
         phrase = str(p.get("phrase", "")).strip()
-        if len(phrase) >= 3:
+        if _is_good_evidence_phrase(phrase, p.get("strength")):
             snippets.append((phrase, "hl-reliable"))
     if not snippets:
         return escape(text)
     snippets.sort(key=lambda item: len(item[0]), reverse=True)
-    pattern = re.compile("|".join(re.escape(s[0]) for s in snippets), re.IGNORECASE)
+    alternatives = [rf"(?<![\w']){re.escape(s[0])}(?![\w'])" for s in snippets]
+    pattern = re.compile("|".join(alternatives), re.IGNORECASE)
     style_by_lower = {phrase.lower(): css for phrase, css in snippets}
 
     def repl(match: re.Match[str]) -> str:
@@ -265,6 +527,38 @@ def _quality_card(label: str, value: Any, helper: str = "") -> str:
         f'<div class="quality-helper">{escape(helper)}</div>'
         "</div>"
     )
+
+
+def _verdict_card_html(
+    score: float,
+    dims: dict[str, Any],
+    review_count: int,
+    reliable_count: int,
+    *,
+    compact: bool = False,
+) -> str:
+    verdict = _ai_verdict(score)
+    title_tag = "h4" if compact else "h3"
+    risk_label, risk_css = _score_label(score)
+    composite = float(dims.get("composite_attention_0_to_1", score))
+    ai_style = float(dims.get("ai_text_experimental_0_to_1", 0))
+    return f"""
+    <div class="verdict-card">
+      <span class="verdict-pill {verdict["css"]}">AI Prediction · {verdict["prediction"]}</span>
+      <{title_tag}>{escape(verdict["headline"])}</{title_tag}>
+      <div class="verdict-score">{score:.0%}</div>
+      <p class="small-muted">{escape(verdict["detail"])}</p>
+      <div class="mini-stat-grid">
+        <div class="mini-stat"><b>{escape(verdict["confidence"])}</b><span>prediction confidence</span></div>
+        <div class="mini-stat"><b>{risk_label}</b><span>review attention</span></div>
+        <div class="mini-stat"><b>{composite:.0%}</b><span>composite attention</span></div>
+        <div class="mini-stat"><b>{ai_style:.0%}</b><span>AI-style heuristic</span></div>
+        <div class="mini-stat"><b>{review_count}</b><span>fake/review evidence terms</span></div>
+        <div class="mini-stat"><b>{reliable_count}</b><span>real/reliable evidence terms</span></div>
+      </div>
+      <p class="small-muted">Status: <span class="ntp-status {risk_css}">{risk_label} · {score:.0%}</span></p>
+    </div>
+    """
 
 
 def _inject_css() -> None:
@@ -355,6 +649,75 @@ def _inject_css() -> None:
           margin: 0;
           font-size: .9rem;
           line-height: 1.55;
+        }
+        .verdict-card {
+          border: 1px solid var(--ntp-border);
+          border-radius: 22px;
+          background:
+            linear-gradient(160deg, rgba(16,22,36,.94), rgba(10,14,20,.94)),
+            radial-gradient(circle at 80% 0%, rgba(103,232,201,.14), transparent 34%);
+          padding: 1.15rem;
+          margin: 1rem 0;
+          box-shadow: 0 18px 45px rgba(0,0,0,.26);
+        }
+        .verdict-card h3,
+        .verdict-card h4 {
+          margin: .55rem 0 .35rem;
+        }
+        .verdict-pill {
+          display: inline-flex;
+          align-items: center;
+          border-radius: 999px;
+          padding: .42rem .78rem;
+          font-weight: 850;
+          letter-spacing: .08em;
+          text-transform: uppercase;
+          font-size: .76rem;
+          border: 1px solid var(--ntp-border);
+        }
+        .verdict-pill.real {
+          color: var(--ntp-ok);
+          background: rgba(74,222,128,.1);
+          border-color: rgba(74,222,128,.35);
+        }
+        .verdict-pill.fake {
+          color: var(--ntp-danger);
+          background: rgba(251,113,133,.1);
+          border-color: rgba(251,113,133,.35);
+        }
+        .verdict-pill.review {
+          color: var(--ntp-warn);
+          background: rgba(251,191,36,.1);
+          border-color: rgba(251,191,36,.35);
+        }
+        .verdict-score {
+          font-size: clamp(2rem, 4vw, 3.2rem);
+          line-height: 1;
+          font-weight: 900;
+          letter-spacing: -.06em;
+          margin: .3rem 0;
+        }
+        .mini-stat-grid {
+          display: grid;
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: .75rem;
+          margin-top: .85rem;
+        }
+        .mini-stat {
+          border: 1px solid var(--ntp-border);
+          border-radius: 14px;
+          background: rgba(10,14,20,.62);
+          padding: .8rem;
+        }
+        .mini-stat b {
+          display: block;
+          color: var(--ntp-text);
+          font-size: 1.25rem;
+          margin-bottom: .2rem;
+        }
+        .mini-stat span {
+          color: var(--ntp-muted);
+          font-size: .76rem;
         }
         .ntp-status {
           display: inline-flex;
@@ -511,6 +874,31 @@ def _render_signal_cards(cards: list[dict[str, Any]]) -> None:
             st.caption(reason)
 
 
+def _render_compact_analysis_panel(data: dict[str, Any]) -> None:
+    platform = data.get("platform") or {}
+    dims = platform.get("dimensions") or {}
+    score = float(data.get("score_toward_review_0_to_1") or 0)
+    phrases = (data.get("interpretability") or {}).get("phrases_in_your_text") or []
+    review_phrases, reliable_phrases = _split_phrases(phrases)
+
+    st.markdown("## AI Result")
+    st.markdown(
+        _verdict_card_html(score, dims, len(review_phrases), len(reliable_phrases), compact=True),
+        unsafe_allow_html=True,
+    )
+
+    top_review = [str(p.get("phrase", "")).strip() for p in review_phrases[:4] if p.get("phrase")]
+    top_reliable = [str(p.get("phrase", "")).strip() for p in reliable_phrases[:4] if p.get("phrase")]
+    if top_review or top_reliable:
+        st.markdown("### Top Recognized Words")
+        if top_review:
+            st.markdown("**Fake / review signals**")
+            st.caption(", ".join(top_review))
+        if top_reliable:
+            st.markdown("**Real / reliable signals**")
+            st.caption(", ".join(top_reliable))
+
+
 def _render_results(data: dict[str, Any]) -> None:
     platform = data.get("platform") or {}
     dims = platform.get("dimensions") or {}
@@ -519,11 +907,15 @@ def _render_results(data: dict[str, Any]) -> None:
     label, css = _score_label(score)
     source = data.get("source") or {}
     source_type = source.get("type", "paste")
+    interp = data.get("interpretability") or {}
     article_text = ""
-    if source_type == "url" and platform.get("article_summary"):
-        article_text = platform["article_summary"]
-    elif st.session_state.get("last_source_text"):
+    if st.session_state.get("last_source_text"):
         article_text = str(st.session_state.last_source_text)
+    elif source_type == "url" and platform.get("article_summary"):
+        article_text = platform["article_summary"]
+    phrases = interp.get("phrases_in_your_text") or []
+    review_phrases, reliable_phrases = _split_phrases(phrases)
+    phrase_df = _phrase_df(phrases)
 
     st.subheader("Analysis Results")
     st.markdown(
@@ -536,10 +928,6 @@ def _render_results(data: dict[str, Any]) -> None:
     m1.metric("Misinformation-style", f"{float(dims.get('misinformation_style_0_to_1', score)):.0%}")
     m2.metric("AI-style heuristic", f"{float(dims.get('ai_text_experimental_0_to_1', 0)):.0%}")
     m3.metric("Composite attention", f"{float(dims.get('composite_attention_0_to_1', score)):.0%}")
-
-    phrases = (data.get("interpretability") or {}).get("phrases_in_your_text") or []
-    review_phrases, reliable_phrases = _split_phrases(phrases)
-    phrase_df = _phrase_df(phrases)
 
     overview_tab, evidence_tab, charts_tab, quality_tab, action_tab = st.tabs(
         ["Overview", "Highlighted Evidence", "Charts", "Model Quality", "Action Plan"]
@@ -560,8 +948,17 @@ def _render_results(data: dict[str, Any]) -> None:
 
     with evidence_tab:
         st.markdown("### Why did the model react this way?")
+        evidence_method = interp.get("evidence_method", "model_perturbation")
+        method_copy = (
+            "These words are based on a perturbation test for this unseen article: the app removes each candidate word, "
+            "re-runs the active model, and measures how much the real/fake probability changes."
+            if evidence_method == "model_perturbation"
+            else "These words come from the interpretable classical linear explainer because perturbation evidence was too weak."
+        )
         st.markdown(
-            '<p class="small-muted">Highlighted yellow/red terms pushed the model toward review. Green terms pulled it toward reliable-style language. These are statistical TF-IDF/logistic-regression cues, not proof of truth or falsehood.</p>',
+            f'<p class="small-muted">Highlighted yellow/red terms pushed the model toward fake/review. '
+            f'Green terms pulled it toward real/reliable. {escape(method_copy)} '
+            f'This explains model behavior, not guaranteed factual truth.</p>',
             unsafe_allow_html=True,
         )
         if article_text:
@@ -592,6 +989,17 @@ def _render_results(data: dict[str, Any]) -> None:
 
     with charts_tab:
         st.markdown("### Analysis Charts")
+        verdict = _ai_verdict(score)
+        probability_df = pd.DataFrame(
+            [
+                {"label": "Real", "probability": 1 - score},
+                {"label": "Fake", "probability": score},
+            ]
+        )
+        st.markdown(f"#### Real vs Fake Prediction: **{verdict['prediction']}**")
+        st.caption("The fake probability is the model's review-class score; real probability is the remaining lower-risk side.")
+        st.bar_chart(probability_df.set_index("label"), height=220)
+
         dim_df = pd.DataFrame(
             [
                 {"signal": "Misinformation-style", "score": float(dims.get("misinformation_style_0_to_1", score))},
@@ -734,6 +1142,7 @@ def _initialize_state() -> None:
     st.session_state.setdefault("body", "")
     st.session_state.setdefault("url", "")
     st.session_state.setdefault("backend", "classical")
+    st.session_state.setdefault("backend_user_selected", False)
     st.session_state.setdefault("last_result", None)
     st.session_state.setdefault("last_source_text", "")
     st.session_state.setdefault("auto_demo_done", False)
@@ -786,6 +1195,12 @@ def main() -> None:
             st.session_state.last_error = str(exc)
 
     ready = _warm_models()
+    preferred_backend = _best_available_backend(ready)
+    if (
+        not st.session_state.backend_user_selected
+        or not ready.get(str(st.session_state.backend), False)
+    ):
+        st.session_state.backend = preferred_backend
 
     with st.sidebar:
         st.title(_brand())
@@ -800,7 +1215,8 @@ def main() -> None:
             "Backend",
             options=available_backends,
             key="backend",
-            help="Classical uses the existing TF-IDF + Logistic Regression artifact.",
+            on_change=_mark_backend_selected,
+            help="Classical is the stable default. Select BiLSTM or mini-transformer manually when you want neural inference.",
         )
         st.markdown("### Artifact Status")
         for name, ok in ready.items():
@@ -850,6 +1266,8 @@ def main() -> None:
         '<p class="small-muted">Results render on the right immediately. Use the sample button for a zero-typing demo.</p>',
             unsafe_allow_html=True,
         )
+        if st.session_state.last_result:
+            _render_compact_analysis_panel(st.session_state.last_result)
 
     with right:
         if st.session_state.get("last_error"):

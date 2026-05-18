@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: news-trust-platform
+    env: python
+    plan: free
+    buildCommand: pip install --upgrade pip && pip install -e .
+    startCommand: streamlit run streamlit_app.py --server.address 0.0.0.0 --server.port $PORT --server.headless true --browser.gatherUsageStats false
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: PLATFORM_BRAND_NAME
+        value: News Trust Platform

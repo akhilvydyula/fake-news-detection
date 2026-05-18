@@ -1,0 +1,128 @@
+{
+  "classical": {
+    "train": {
+      "precision": 0.9701591511936339,
+      "recall": 0.9868465430016864,
+      "f1": 0.9784317003845511,
+      "threshold": 0.5,
+      "confusion_matrix": [
+        [
+          3945,
+          90
+        ],
+        [
+          39,
+          2926
+        ]
+      ],
+      "confusion_labels": [
+        "predicted_reliable",
+        "predicted_review"
+      ],
+      "roc_auc": 0.995886415449973
+    },
+    "val": {
+      "precision": 0.9490740740740741,
+      "recall": 0.968503937007874,
+      "f1": 0.9586905689789555,
+      "threshold": 0.5,
+      "confusion_matrix": [
+        [
+          832,
+          33
+        ],
+        [
+          20,
+          615
+        ]
+      ],
+      "confusion_labels": [
+        "predicted_reliable",
+        "predicted_review"
+      ],
+      "roc_auc": 0.9908970916207729
+    },
+    "test": {
+      "precision": 0.9446153846153846,
+      "recall": 0.9669291338582677,
+      "f1": 0.9556420233463035,
+      "threshold": 0.5,
+      "confusion_matrix": [
+        [
+          829,
+          36
+        ],
+        [
+          21,
+          614
+        ]
+      ],
+      "confusion_labels": [
+        "predicted_reliable",
+        "predicted_review"
+      ],
+      "roc_auc": 0.9873815484047153
+    }
+  },
+  "keras": {
+    "bilstm_val": {
+      "val_precision": 0.9672897196261683,
+      "val_recall": 0.9779527559055118,
+      "val_f1": 0.9725920125293657,
+      "val_roc_auc": 0.9966246415729826
+    },
+    "mini_transformer_val": {
+      "val_precision": 0.9685430463576159,
+      "val_recall": 0.9212598425196851,
+      "val_f1": 0.9443099273607748,
+      "val_roc_auc": 0.9928360111055482
+    },
+    "bilstm_test": {
+      "precision": 0.9625,
+      "recall": 0.9700787401574803,
+      "f1": 0.9662745098039216,
+      "threshold": 0.5,
+      "confusion_matrix": [
+        [
+          841,
+          24
+        ],
+        [
+          19,
+          616
+        ]
+      ],
+      "confusion_labels": [
+        "predicted_reliable",
+        "predicted_review"
+      ],
+      "roc_auc": 0.9942251149242183
+    },
+    "mini_transformer_test": {
+      "precision": 0.966996699669967,
+      "recall": 0.9228346456692913,
+      "f1": 0.9443996776792909,
+      "threshold": 0.5,
+      "confusion_matrix": [
+        [
+          845,
+          20
+        ],
+        [
+          49,
+          586
+        ]
+      ],
+      "confusion_labels": [
+        "predicted_reliable",
+        "predicted_review"
+      ],
+      "roc_auc": 0.9909007327841246
+    }
+  },
+  "overfitting_note": "Validation and test ROC-AUC are close - hold-out split looks stable.",
+  "label_meaning": {
+    "is_fake_1": "Model treats as 'needs editorial review' relative to training data.",
+    "is_fake_0": "Closer to 'reliable' articles in training\u2014not a guarantee of truth."
+  }
+}
