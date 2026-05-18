@@ -23,7 +23,7 @@
 # Override port:    make serve PORT=8765   or   export NTP_PORT=8765 && make serve
 # =============================================================================
 
-.PHONY: help venv setup install migrate score-feeds train train-quick serve dev ui streamlit streamlit-ui product test doctor mlflow-ui lab-train stop restart
+.PHONY: help venv setup install migrate score-feeds train train-quick serve dev ui run streamlit streamlit-ui product test doctor mlflow-ui lab-train stop restart
 
 PYTHON ?= python
 PORT ?= 8000
@@ -34,6 +34,7 @@ VENV_PY := .venv/bin/python
 help:
 	@echo "Streamlit product UI (recommended; no model training):"
 	@echo "  make setup && make streamlit    # bootstrap venv + deps, then product UI"
+	@echo "  make run                        # same as make streamlit; open http://localhost:8501/?demo=1"
 	@echo "  make streamlit                  # open http://localhost:8501/?demo=1"
 	@echo ""
 	@echo "Legacy local server:"
@@ -84,6 +85,7 @@ lab-train: train-quick serve
 streamlit:
 	$(PYTHON) -m streamlit run streamlit_app.py --server.port 8501 --browser.gatherUsageStats false
 
+run: streamlit
 streamlit-ui: streamlit
 product: streamlit
 

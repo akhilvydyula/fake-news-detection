@@ -1,4 +1,4 @@
-# News Trust Platform — launcher (Windows PowerShell).
+# News Trust Platform - launcher (Windows PowerShell).
 # Usage (from project root):
 #   .\run.ps1                 # start dashboard (port 8000 or $env:NTP_PORT)
 #   .\run.ps1 streamlit       # start Streamlit product UI (recommended MVP)
@@ -124,7 +124,7 @@ switch ($Command) {
             }
             "streamlit" {
                 Write-Host ""
-                Write-Host "  News Trust Platform — Streamlit Product UI" -ForegroundColor Cyan
+                Write-Host "  News Trust Platform - Streamlit Product UI" -ForegroundColor Cyan
                 Write-Host "  ----------------------------------------"
                 Write-Host "  App:       http://localhost:8501"
                 Write-Host "  Auto demo: http://localhost:8501/?demo=1"

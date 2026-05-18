@@ -5,12 +5,10 @@
 # Core ML / data
 numpy>=1.26.0
 pandas>=2.2.0
-scikit-learn>=1.5.0
-datasets>=3.0.0
-huggingface_hub>=0.24.0
+scikit-learn>=1.5.0,<1.8.0
 
-# Deep learning (TensorFlow / Keras)
-tensorflow>=2.16.0
+# Training dependencies are optional. Install only when retraining:
+#   pip install -e ".[training]"
 
 # NLP utilities
 regex>=2024.0.0
@@ -23,8 +21,8 @@ beautifulsoup4>=4.12.0
 feedparser>=6.0.11
 streamlit>=1.40.0
 
-# Experiment tracking (optional at runtime; used when --mlflow is passed)
-mlflow>=2.16.0
+# Experiment tracking is optional. Install when needed:
+#   pip install -e ".[tracking]"
 
 # Dev / CI
 pytest>=8.0.0
