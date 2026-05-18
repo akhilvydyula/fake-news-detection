@@ -1,14 +1,17 @@
 # News Trust Platform — launcher (Windows PowerShell).
 # Usage (from project root):
 #   .\run.ps1                 # start dashboard (port 8000 or $env:NTP_PORT)
+#   .\run.ps1 streamlit       # start Streamlit product UI (recommended MVP)
 #   .\run.ps1 -Port 8765      # listen on 8765
 #   .\run.ps1 stop            # kill whatever is listening on that port
 #   .\run.ps1 restart         # stop then serve (same port)
 #   .\run.ps1 setup           # first-time venv + pip install -e ".[dev]"
+#   .\run.ps1 migrate         # apply Django migrations
+#   .\run.ps1 score-feeds     # seed RSS feeds (if empty), ingest, and score
 
 param(
     [Parameter(Position = 0)]
-    [ValidateSet("serve", "worker", "setup", "train", "train-quick", "test", "doctor", "stop", "restart")]
+    [ValidateSet("serve", "streamlit", "worker", "setup", "migrate", "score-feeds", "train", "train-quick", "test", "doctor", "stop", "restart")]
     [string]$Command = "serve",
     [int]$Port = 0
 )
@@ -81,7 +84,7 @@ switch ($Command) {
         }
         & $venvPython -m pip install -U pip
         & $venvPython -m pip install -e ".[dev]"
-        Write-Host "Setup done. Start UI: .\run.ps1 serve   (optional: .\run.ps1 train)"
+        Write-Host "Setup done. Start Streamlit UI: .\run.ps1 streamlit   (optional: .\run.ps1 train)"
         break
     }
     "stop" {
@@ -118,6 +121,21 @@ switch ($Command) {
                 Write-ServeBanner $p
                 $env:NTP_PORT = "$p"
                 & $venvPython (Join-Path $Root "manage.py") runserver "127.0.0.1:$p"
+            }
+            "streamlit" {
+                Write-Host ""
+                Write-Host "  News Trust Platform — Streamlit Product UI" -ForegroundColor Cyan
+                Write-Host "  ----------------------------------------"
+                Write-Host "  App:       http://localhost:8501"
+                Write-Host "  Auto demo: http://localhost:8501/?demo=1"
+                Write-Host ""
+                & $venvPython -m streamlit run (Join-Path $Root "streamlit_app.py") --server.port 8501 --browser.gatherUsageStats false
+            }
+            "migrate" {
+                & $venvPython (Join-Path $Root "manage.py") migrate
+            }
+            "score-feeds" {
+                & $venvPython (Join-Path $Root "manage.py") score_feeds --seed
             }
             "worker" {
                 & $venvPython (Join-Path $Root "manage.py") process_jobs --poll-interval 2 --worker-name win-worker

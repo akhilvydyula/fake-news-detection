@@ -3,12 +3,12 @@
 #
 # FRONTEND / UI FOCUS (no training)
 #   You already have trained artifacts under artifacts/ — just run the app:
-#       make install && make serve
+#       make install && make streamlit
 #   Or one step on macOS / Linux / WSL (creates .venv if needed):
-#       make setup && make serve
+#       make setup && make streamlit
 #
-#   Open: http://127.0.0.1:8000/#dashboard
-#   Aliases: make dev   or   make ui   (same as serve)
+#   Open: http://localhost:8501/?demo=1
+#   Aliases: make product   or   make streamlit-ui
 #
 # TRAINING (optional, do later)
 #   make train          # full pipeline
@@ -23,7 +23,7 @@
 # Override port:    make serve PORT=8765   or   export NTP_PORT=8765 && make serve
 # =============================================================================
 
-.PHONY: help venv setup install train train-quick serve dev ui test doctor mlflow-ui lab-train stop restart
+.PHONY: help venv setup install migrate score-feeds train train-quick serve dev ui streamlit streamlit-ui product test doctor mlflow-ui lab-train stop restart
 
 PYTHON ?= python
 PORT ?= 8000
@@ -32,25 +32,29 @@ PORT ?= 8000
 VENV_PY := .venv/bin/python
 
 help:
-	@echo "UI + API (default path — no model training):"
-	@echo "  make setup && make serve    # bootstrap venv + deps, then dashboard"
+	@echo "Streamlit product UI (recommended; no model training):"
+	@echo "  make setup && make streamlit    # bootstrap venv + deps, then product UI"
+	@echo "  make streamlit                  # open http://localhost:8501/?demo=1"
+	@echo ""
+	@echo "Legacy local server:"
 	@echo "  make serve  (aliases: dev, ui)  — set PORT=8765 to change; open http://127.0.0.1:PORT/#dashboard"
 	@echo ""
 	@echo "Optional training (when you want new artifacts):"
 	@echo "  make train | make train-quick | make lab-train"
 	@echo ""
+	@echo "RSS pipeline: make migrate && make score-feeds"
 	@echo "Other: make test | make doctor | make stop PORT=8000 | make restart | make install | make venv"
 
 # Create only the virtualenv; then activate and make install (or use make setup).
 venv:
 	$(PYTHON) -m venv .venv
-	@echo "Next: activate .venv (source .venv/bin/activate), then: make install && make serve"
+	@echo "Next: activate .venv (source .venv/bin/activate), then: make install && make streamlit"
 
 # Bootstrap: create .venv if missing, install deps (Unix path to python).
 setup: $(VENV_PY)
 	$(VENV_PY) -m pip install -U pip
 	$(VENV_PY) -m pip install -e ".[dev]"
-	@echo "Setup done. Start UI: make serve   (training optional: make train)"
+	@echo "Setup done. Start Streamlit UI: make streamlit   (training optional: make train)"
 
 $(VENV_PY):
 	$(PYTHON) -m venv .venv
@@ -59,6 +63,12 @@ $(VENV_PY):
 install:
 	$(PYTHON) -m pip install -U pip
 	$(PYTHON) -m pip install -e ".[dev]"
+
+migrate:
+	$(PYTHON) manage.py migrate
+
+score-feeds:
+	$(PYTHON) manage.py score_feeds --seed
 
 # --- Training (optional) -------------------------------------------------------
 train:
@@ -70,7 +80,14 @@ train-quick:
 # Retrain then serve — only when you explicitly want a fresh quick train.
 lab-train: train-quick serve
 
-# --- App — dashboard + REST API (uses existing artifacts/) --------------------
+# --- Streamlit product UI (recommended MVP; uses existing artifacts/) ----------
+streamlit:
+	$(PYTHON) -m streamlit run streamlit_app.py --server.port 8501 --browser.gatherUsageStats false
+
+streamlit-ui: streamlit
+product: streamlit
+
+# --- Legacy app — dashboard + REST API (uses existing artifacts/) -------------
 serve:
 	$(PYTHON) manage.py runserver 127.0.0.1:$(PORT)
 
