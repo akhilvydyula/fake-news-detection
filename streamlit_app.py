@@ -19,6 +19,7 @@ import httpx
 import pandas as pd
 import streamlit as st
 from django.apps import apps
+from django.core.management import call_command
 
 from src.ingest.fetch_url import fetch_url_text
 from src.service.enrichment import enrich_platform_payload
@@ -185,6 +186,16 @@ def _best_available_backend(ready: dict[str, bool]) -> Backend:
     return "classical"
 
 
+def _backend_label(backend: Backend, ready: dict[str, bool]) -> str:
+    names = {
+        "classical": "Classical TF-IDF + Logistic Regression",
+        "bilstm": "BiLSTM neural model",
+        "mini_transformer": "Mini Transformer neural model",
+    }
+    status = "available" if ready.get(backend) else "artifact missing"
+    return f"{names[backend]} ({status})"
+
+
 def _mark_backend_selected() -> None:
     st.session_state.backend_user_selected = True
 
@@ -194,6 +205,13 @@ def _setup_django() -> None:
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", "newstrust.settings")
     if not apps.ready:
         django.setup()
+
+
+@st.cache_resource(show_spinner=False)
+def _ensure_django_db() -> None:
+    """Create/update SQLite tables for Streamlit deployments such as Render."""
+    _setup_django()
+    call_command("migrate", interactive=False, verbosity=0)
 
 
 @st.cache_resource(show_spinner=False)
@@ -268,14 +286,14 @@ def _attach_interpretable_evidence(payload: dict[str, Any], text: str, backend: 
 
 
 def _run_rss_ingest() -> dict[str, int]:
-    _setup_django()
+    _ensure_django_db()
     from platformapp.services import fetch_and_score_feeds
 
     return fetch_and_score_feeds(max_entries_per_feed=5)
 
 
 def _recent_rss_articles(limit: int = 25) -> list[dict[str, Any]]:
-    _setup_django()
+    _ensure_django_db()
     from platformapp.models import ScoredArticle
 
     rows = (
@@ -302,7 +320,8 @@ def _analyze_text(title: str, body: str, backend: Backend) -> dict[str, Any]:
     base = build_api_response(text, backend, teacher_mode=False)
     if base is None:
         raise RuntimeError(
-            f"Model files for '{backend}' are missing. Use the Classical backend or add trained artifacts."
+            f"Model files for '{backend}' are missing or TensorFlow is not installed. "
+            "Use the Classical backend, or deploy the trained neural artifact and install the neural runtime."
         )
     out = enrich_platform_payload(base, text, backend)
     out = _attach_interpretable_evidence(out, text, backend)
@@ -325,7 +344,8 @@ def _analyze_url(url: str, backend: Backend) -> dict[str, Any]:
     base = build_api_response(text, backend, teacher_mode=False)
     if base is None:
         raise RuntimeError(
-            f"Model files for '{backend}' are missing. Use the Classical backend or add trained artifacts."
+            f"Model files for '{backend}' are missing or TensorFlow is not installed. "
+            "Use the Classical backend, or deploy the trained neural artifact and install the neural runtime."
         )
     out = enrich_platform_payload(base, text, backend)
     out = _attach_interpretable_evidence(out, text, backend)
@@ -1206,21 +1226,20 @@ def main() -> None:
         st.title(_brand())
         st.caption("Streamlit MVP · no model training required")
         st.markdown("### Model")
-        available_backends: list[Backend] = ["classical"]
-        if ready.get("bilstm"):
-            available_backends.append("bilstm")
-        if ready.get("mini_transformer"):
-            available_backends.append("mini_transformer")
+        available_backends: list[Backend] = ["classical", "bilstm", "mini_transformer"]
         st.selectbox(
             "Backend",
             options=available_backends,
             key="backend",
+            format_func=lambda backend: _backend_label(backend, ready),
             on_change=_mark_backend_selected,
-            help="Classical is the stable default. Select BiLSTM or mini-transformer manually when you want neural inference.",
+            help="Neural backends are selectable, but they require their model.keras artifacts and TensorFlow runtime.",
         )
         st.markdown("### Artifact Status")
         for name, ok in ready.items():
             st.write(("✅" if ok else "⚠️") + f" {name}")
+        if not ready.get("bilstm") or not ready.get("mini_transformer"):
+            st.caption("To enable neural inference, add `artifacts/keras_bilstm/model.keras` and `artifacts/keras_mini_transformer/model.keras`.")
         st.divider()
         st.caption("Local: `run.bat streamlit`")
         st.caption("Demo URL: `?demo=1`")

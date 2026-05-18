@@ -48,7 +48,10 @@ def _keras_model(kind: str) -> Any:
     import os
 
     os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
-    import tensorflow as tf
+    try:
+        import tensorflow as tf
+    except ImportError:
+        return None
 
     return tf.keras.models.load_model(path)
 
