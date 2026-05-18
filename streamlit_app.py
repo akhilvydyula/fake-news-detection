@@ -339,7 +339,7 @@ def _render_results(data: dict[str, Any]) -> None:
             }
             for p in phrases
         ]
-        st.dataframe(rows, use_container_width=True, hide_index=True)
+        st.dataframe(rows, width="stretch", hide_index=True)
 
     with st.expander("Model and product caveats", expanded=False):
         for title, copy in product_framing().items():
@@ -353,7 +353,7 @@ def _render_rss_monitor() -> None:
     st.caption("Use this as the product review queue. In production, run the same job daily with cron, GitLab schedules, or a platform scheduler.")
     c1, c2 = st.columns([0.32, 0.68])
     with c1:
-        if st.button("Run RSS ingest now", use_container_width=True):
+        if st.button("Run RSS ingest now", width="stretch"):
             try:
                 result = _run_rss_ingest()
                 st.success(f"RSS ingest complete: {result}")
@@ -370,7 +370,7 @@ def _render_rss_monitor() -> None:
         st.info(f"Run migrations first to enable the RSS queue: {exc}")
         return
     if rows:
-        st.dataframe(rows, use_container_width=True, hide_index=True)
+        st.dataframe(rows, width="stretch", hide_index=True)
     else:
         st.info("No scored RSS articles yet. Click Run RSS ingest now or run `run.bat score-feeds`.")
 
@@ -389,6 +389,13 @@ def _set_sample() -> None:
     st.session_state.mode = "Paste"
     st.session_state.title = SAMPLE_TITLE
     st.session_state.body = SAMPLE_BODY
+
+
+def _run_sample_analysis() -> None:
+    """Run the tested sample without mutating widget state after render."""
+    backend = st.session_state.backend
+    with st.spinner("Analyzing the tested sample with the current model artifacts..."):
+        st.session_state.last_result = _analyze_text(SAMPLE_TITLE, SAMPLE_BODY, backend)
 
 
 def _run_analysis() -> None:
@@ -471,15 +478,14 @@ def main() -> None:
 
         c1, c2 = st.columns(2)
         with c1:
-            if st.button("Load Sample & Run", use_container_width=True, type="secondary"):
-                _set_sample()
+            if st.button("Load Sample & Run", width="stretch", type="secondary"):
                 try:
-                    _run_analysis()
+                    _run_sample_analysis()
                     st.rerun()
                 except Exception as exc:  # noqa: BLE001
                     st.error(str(exc))
         with c2:
-            if st.button("Analyze", use_container_width=True, type="primary"):
+            if st.button("Analyze", width="stretch", type="primary"):
                 try:
                     _run_analysis()
                     st.rerun()
@@ -487,7 +493,7 @@ def main() -> None:
                     st.error(str(exc))
 
         st.markdown(
-            '<p class="small-muted">Results render on the right immediately. Use the sample button for a zero-typing demo.</p>',
+        '<p class="small-muted">Results render on the right immediately. Use the sample button for a zero-typing demo.</p>',
             unsafe_allow_html=True,
         )
 
@@ -502,8 +508,8 @@ def main() -> None:
                 """
                 <div class="ntp-card">
                   <h4>Ready for a one-click demo</h4>
-                  <p>Click <strong>Load Sample & Run</strong>. The app will fill tested sample copy,
-                  run the existing model, and display signal cards here.</p>
+                  <p>Click <strong>Load Sample & Run</strong>. The app will run tested sample copy
+                  through the existing model and display signal cards here.</p>
                 </div>
                 """,
                 unsafe_allow_html=True,

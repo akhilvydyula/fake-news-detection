@@ -9,6 +9,14 @@ from platformapp.models import RSSFeed
 from platformapp.services import fetch_and_score_feeds
 
 
+DEFAULT_FEEDS = [
+    ("NYTimes World", "https://rss.nytimes.com/services/xml/rss/nyt/World.xml"),
+    ("NPR News", "https://www.npr.org/rss/rss.php?id=1001"),
+    ("Guardian World", "https://www.theguardian.com/world/rss"),
+    ("Sky News World", "https://feeds.skynews.com/feeds/rss/world.xml"),
+]
+
+
 class Command(BaseCommand):
     help = "Fetch active RSS feeds, store unseen articles, score them, and flag high-risk items."
 
@@ -19,18 +27,21 @@ class Command(BaseCommand):
         parser.add_argument(
             "--seed",
             action="store_true",
-            help="Create a small starter feed list if no feeds exist.",
+            help="Upsert reliable starter feeds before ingesting.",
         )
 
     def handle(self, *args: Any, **options: Any) -> None:
-        if options["seed"] and not RSSFeed.objects.exists():
-            RSSFeed.objects.bulk_create(
-                [
-                    RSSFeed(name="BBC World", url="https://feeds.bbci.co.uk/news/world/rss.xml"),
-                    RSSFeed(name="Reuters Top News", url="https://www.reutersagency.com/feed/?best-topics=top-news"),
-                ],
-                ignore_conflicts=True,
+        if options["seed"]:
+            # Deactivate a previously seeded URL that commonly fails or returns non-standard XML.
+            RSSFeed.objects.filter(name__in=["BBC World", "Reuters Top News"]).update(
+                is_active=False,
+                last_error="Deactivated default seed: use a reliable RSS endpoint instead.",
             )
+            for name, url in DEFAULT_FEEDS:
+                RSSFeed.objects.update_or_create(
+                    url=url,
+                    defaults={"name": name, "is_active": True, "last_error": ""},
+                )
             self.stdout.write(self.style.SUCCESS("Seeded starter RSS feeds."))
 
         result = fetch_and_score_feeds(
