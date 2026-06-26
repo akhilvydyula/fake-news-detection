@@ -1,5 +1,12 @@
 # Fake news detection prototype
 
+[![License: MIT](https://img.shields.io/github/license/akhilvydyula/fake-news-detection)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-3776AB?logo=python&logoColor=white)](https://www.python.org/downloads/)
+[![TensorFlow](https://img.shields.io/badge/TensorFlow-FF6F00?logo=tensorflow&logoColor=white)](https://www.tensorflow.org/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io/)
+[![GitHub stars](https://img.shields.io/github/stars/akhilvydyula/fake-news-detection?style=social)](https://github.com/akhilvydyula/fake-news-detection/stargazers)
+[![Open Source](https://img.shields.io/badge/open%20source-welcome-brightgreen)](#open-source)
+
 **Step-by-step runbook (setup, train, UI, shortcuts):** [DOCUMENTATION.md](DOCUMENTATION.md) · **Product / automation / teaching narrative:** [PRODUCT_AUTOMATION.md](PRODUCT_AUTOMATION.md)
 
 **Investor demo docs:** [DEMO_TODAY.md](DEMO_TODAY.md) · [INVESTOR_ONE_PAGER.md](INVESTOR_ONE_PAGER.md)
@@ -268,7 +275,22 @@ Do **not** auto-delete or auto-publish purely from the model; use it as **decisi
 - `src/pipeline/run_train.py` — orchestration
 - `src/pipeline/predict_cli.py` — CLI scoring
 
+## Open source
+
+This repository is **open source** under the [MIT License](LICENSE). Stars, issues, and pull requests are welcome — they help others discover the project and improve it for the community.
+
+### How you can help
+
+- **Star** the repo if you find it useful — it helps visibility on GitHub Explore and search.
+- **Open an issue** for bugs, ideas, or questions.
+- **Submit a pull request** with a focused change and a clear description.
+- **Share** the project with students, journalists, or teams building trust-and-safety tooling.
+
+Maintained by [Akhil Vydyula](https://github.com/akhilvydyula) as part of the Skills Marathon ML portfolio.
+
 ## License and ethics
+
+Application code is released under the [MIT License](LICENSE).
 
 - Verify dataset and model licenses before production use.
 - Disclose automated scoring to users or moderators where required.
