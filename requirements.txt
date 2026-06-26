@@ -5,7 +5,7 @@
 # Core ML / data
 numpy>=1.26.0
 pandas>=2.2.0
-scikit-learn>=1.5.0,<1.8.0
+scikit-learn>=1.5.0,<1.10.0
 
 # Training dependencies are optional. Install only when retraining:
 #   pip install -e ".[training]"
