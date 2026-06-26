@@ -279,6 +279,16 @@ Do **not** auto-delete or auto-publish purely from the model; use it as **decisi
 
 This repository is **open source** under the [MIT License](LICENSE). Stars, issues, and pull requests are welcome — they help others discover the project and improve it for the community.
 
+### Project docs for contributors
+
+| Topic | Document |
+|-------|----------|
+| Full OSS inventory (CI/CD, security, community) | [docs/OPEN_SOURCE.md](docs/OPEN_SOURCE.md) |
+| How to contribute | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| Security policy | [SECURITY.md](SECURITY.md) |
+| Compliance and data governance | [docs/COMPLIANCE.md](docs/COMPLIANCE.md) |
+| Code of conduct | [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) |
+
 ### How you can help
 
 - **Star** the repo if you find it useful — it helps visibility on GitHub Explore and search.

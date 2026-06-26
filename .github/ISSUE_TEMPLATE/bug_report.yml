@@ -1,0 +1,29 @@
+name: Bug report
+description: Report incorrect behavior, crashes, or broken docs
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: See [CONTRIBUTING.md](../CONTRIBUTING.md). For security use [SECURITY.md](../SECURITY.md).
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Python version
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or traceback
+      render: shell
